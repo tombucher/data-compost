@@ -98,7 +98,3 @@ data-compost/
 ## Contribuer
 
 Les contributions sont les bienvenues ! Si vous avez des idées d’amélioration ou souhaitez signaler des problèmes, ouvrez une issue ou un pull request.
-
-## Licence
-
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
