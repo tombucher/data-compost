@@ -3,6 +3,7 @@ import json
 import mimetypes
 import logging
 from datetime import datetime
+from pathlib import Path
 import stat
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -20,6 +21,8 @@ import pytesseract
 import colorgram
 from langdetect import detect
 import math
+
+from modules.config import CONFIG
 
 # torch / transformers / torchvision sont lourds (~600 Mo) et optionnels.
 # Si absents, l'analyse vidéo dégrade gracieusement (pas de captioning BLIP).
@@ -76,28 +79,29 @@ def numpy_to_python(obj):
     raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
 
 def get_file_category(file_path):
-    _, ext = os.path.splitext(file_path)
-    ext = ext.lower()
-    
-    if os.path.basename(file_path).startswith('.'):
+    p = Path(file_path)
+    ext = p.suffix.lower()
+
+    if p.name.startswith('.'):
         return "hidden"
-    
+
     for category, extensions in FILE_CATEGORIES.items():
         if ext in extensions:
             return category
-    
+
     # Extension inconnue, on l'ignore
-    logging.info(f"Extension inconnue ignorée: {ext} pour le fichier {file_path}")
+    logger.info(f"Extension inconnue ignorée: {ext} pour le fichier {file_path}")
     return None  # Retourne None pour les fichiers inconnus
 
 
 def get_common_metadata(file_path):
-    stat_info = os.stat(file_path)
-    mime_type, _ = mimetypes.guess_type(file_path)
-    
+    p = Path(file_path)
+    stat_info = p.stat()
+    mime_type, _ = mimetypes.guess_type(str(p))
+
     return {
-        "name": os.path.basename(file_path),
-        "path": os.path.abspath(file_path),
+        "name": p.name,
+        "path": str(p.resolve()),
         "size": stat_info.st_size,
         "created_at": datetime.fromtimestamp(stat_info.st_ctime).isoformat(),
         "modified_at": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
@@ -116,9 +120,10 @@ def create_heatmap(saliency_map, alpha=0.5):
     return cv2.addWeighted(heatmap, alpha, cv2.cvtColor(saliency_map, cv2.COLOR_GRAY2BGR), 1 - alpha, 0)
 
 def analyze_image(file_path):
-    _, ext = os.path.splitext(file_path)
+    file_path = Path(file_path)
+    ext = file_path.suffix
     if ext.lower() == '.svg':
-        file_size = os.path.getsize(file_path)
+        file_size = file_path.stat().st_size
         return {
             "dimensions": (1, 1),  # valeur par défaut
             "format": "SVG",
@@ -131,7 +136,7 @@ def analyze_image(file_path):
 
     try:
         # Open image with Pillow for metadata
-        with Image.open(file_path) as pil_img:
+        with Image.open(str(file_path)) as pil_img:
             # Récupérer les dimensions originales
             orig_width, orig_height = pil_img.size
             format = pil_img.format
@@ -143,14 +148,14 @@ def analyze_image(file_path):
                 width = int(orig_width * ratio)
                 height = int(orig_height * ratio)
                 pil_img = pil_img.resize((width, height), Image.LANCZOS)
-                logging.info(f"Image {file_path} redimensionnée de {orig_width}x{orig_height} à {width}x{height}")
+                logger.info(f"Image {file_path} redimensionnée de {orig_width}x{orig_height} à {width}x{height}")
                 # Sauvegarder temporairement l'image redimensionnée
-                temp_path = file_path + "_temp.jpg"
-                pil_img.save(temp_path, quality=70)  # Qualité réduite pour économiser de l'espace
-                img_path_for_cv = temp_path
+                temp_path = file_path.with_suffix(file_path.suffix + "_temp.jpg")
+                pil_img.save(str(temp_path), quality=70)  # Qualité réduite pour économiser de l'espace
+                img_path_for_cv = str(temp_path)
             else:
                 width, height = orig_width, orig_height
-                img_path_for_cv = file_path
+                img_path_for_cv = str(file_path)
 
         # Read image with OpenCV for processing
         cv_image = cv2.imread(img_path_for_cv)
@@ -158,9 +163,8 @@ def analyze_image(file_path):
             raise ValueError(f"Failed to load image: {file_path}")
 
         # Create output directory
-        from modules.config import CONFIG
-        output_dir = os.path.join(os.path.dirname(file_path), CONFIG.paths.saliency_subdir)
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = file_path.parent / CONFIG.paths.saliency_subdir
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # Saliency map generation
         try:
@@ -187,46 +191,46 @@ def analyze_image(file_path):
         saliency_map_normalized = cv2.normalize(saliency_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
         # Generate saliency visualizations
-        base_filename = os.path.splitext(os.path.basename(file_path))[0]
-        
+        base_filename = file_path.stem
+
         # 1. Grayscale saliency map
-        grayscale_path = os.path.join(output_dir, f"{base_filename}_saliency_gray.png")
-        cv2.imwrite(grayscale_path, saliency_map_normalized)
+        grayscale_path = output_dir / f"{base_filename}_saliency_gray.png"
+        cv2.imwrite(str(grayscale_path), saliency_map_normalized)
 
         # 2. Colored saliency map
         colored_saliency = cv2.applyColorMap(saliency_map_normalized, cv2.COLORMAP_JET)
-        colored_path = os.path.join(output_dir, f"{base_filename}_saliency_color.png")
-        cv2.imwrite(colored_path, colored_saliency)
+        colored_path = output_dir / f"{base_filename}_saliency_color.png"
+        cv2.imwrite(str(colored_path), colored_saliency)
 
         # 3. Raw saliency map (float32)
-        raw_path = os.path.join(output_dir, f"{base_filename}_saliency_raw.npy")
-        np.save(raw_path, saliency_map)
+        raw_path = output_dir / f"{base_filename}_saliency_raw.npy"
+        np.save(str(raw_path), saliency_map)
 
         # Supprimer le fichier temporaire si créé
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.remove(temp_path)
+        if 'temp_path' in locals() and temp_path.exists():
+            temp_path.unlink()
 
         # Extract dominant colors
-        colors = colorgram.extract(file_path, 5)
+        colors = colorgram.extract(str(file_path), 5)
         dominant_colors = [(color.rgb.r, color.rgb.g, color.rgb.b) for color in colors]
 
         # Calculate image quality
-        file_size = os.path.getsize(file_path)
+        file_size = file_path.stat().st_size
         quality = (width * height) / file_size
 
         # Generate description (placeholder)
-        image_description = pytesseract.image_to_string(Image.open(file_path))
+        image_description = pytesseract.image_to_string(Image.open(str(file_path)))
 
         # Prepare JSON data
         data = {
-            "original_image": file_path,
+            "original_image": str(file_path),
             "dimensions": (orig_width, orig_height),  # Dimensions originales
             "processed_dimensions": (width, height),  # Dimensions traitées
             "format": format,
             "mode": mode,
-            "saliency_map_gray": grayscale_path,
-            "saliency_map_color": colored_path,
-            "saliency_map_raw": raw_path,
+            "saliency_map_gray": str(grayscale_path),
+            "saliency_map_color": str(colored_path),
+            "saliency_map_raw": str(raw_path),
             "dominant_colors": dominant_colors,
             "quality": quality,
             "description": image_description
@@ -347,7 +351,8 @@ def analyze_audio(file_path):
         }
 
 def analyze_document(file_path):
-    _, ext = os.path.splitext(file_path)
+    file_path = Path(file_path)
+    ext = file_path.suffix
     if ext.lower() == '.pdf':
         with open(file_path, 'rb') as file:
             reader = PyPDF2.PdfReader(file)
@@ -420,21 +425,18 @@ def analyze_file(file_path):
 
 def count_files(directory):
     """Compte le nombre total de fichiers dans le répertoire et ses sous-répertoires."""
-    return sum([len(files) for r, d, files in os.walk(directory)])
+    return sum(1 for _ in Path(directory).rglob('*') if _.is_file())
 
 def analyze_directory(directory, visualization_queue=None):
     results = []
-    files_to_analyze = []
-
-    for root, _, files in os.walk(directory):
-        for file in files:
-            files_to_analyze.append(os.path.join(root, file))
+    directory = Path(directory)
+    files_to_analyze = [p for p in directory.rglob('*') if p.is_file()]
 
     total_files = len(files_to_analyze)
-    
+
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
         futures = [executor.submit(analyze_file, file_path) for file_path in files_to_analyze]
-        
+
         with tqdm(total=total_files, desc="Analyzing files", unit="file") as pbar:
             for future in as_completed(futures):
                 result = future.result()
@@ -448,28 +450,27 @@ def analyze_directory(directory, visualization_queue=None):
                 pbar.update(1)
 
     # Sauvegardez les résultats dans un fichier
-    output_path = os.path.join('data', 'output', 'analysis_results.json')
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = CONFIG.paths.output_root / 'analysis_results.json'
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=4, default=numpy_to_python)
 
-    logging.info(f"Résultats d'analyse exportés vers {output_path}")
-    return output_path
+    logger.info(f"Résultats d'analyse exportés vers {output_path}")
+    return str(output_path)
 
 def main():
     directory = input("Entrez le chemin du répertoire à analyser : ")
     results = analyze_directory(directory)
 
     # Exporter les résultats en JSON
-    output_path = os.path.join('data', 'output', 'analysis_results.json')
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = CONFIG.paths.output_root / 'analysis_results.json'
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=4)
 
-    logging.info(f"Résultats exportés vers {output_path}")
+    logger.info(f"Résultats exportés vers {output_path}")
     return output_path
 
 if __name__ == "__main__":
-    # Définir le chemin du répertoire à analyser
-    directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'test'))
+    directory = Path(__file__).resolve().parent.parent.parent / 'data' / 'test'
     analyze_directory(directory)

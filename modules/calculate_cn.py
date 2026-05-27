@@ -1,6 +1,7 @@
 import json
-import os
 import logging
+from pathlib import Path
+
 import numpy as np
 from datetime import datetime
 import math
@@ -164,6 +165,5 @@ def calculate_cn(input_path):
 
 
 if __name__ == "__main__":
-    # Définir le chemin du fichier d'analyse
-    input_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'analysis_results.json'))
+    input_path = Path(__file__).resolve().parent.parent.parent / 'data' / 'analysis_results.json'
     calculate_cn(input_path)

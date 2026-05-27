@@ -1,7 +1,7 @@
-import os
 import json
 import time
 import random
+from pathlib import Path
 from PIL import Image
 import cv2
 import numpy as np
@@ -10,30 +10,20 @@ from nltk.corpus import wordnet
 from scipy.ndimage import gaussian_filter
 import io
 
-# Importer les modules personnalisés
-try:
-    from modules.analyze import analyze_file
-    from modules.create_silos import create_silos
-except ImportError:
-    try:
-        from src.modules.analyze import analyze_file
-        from src.modules.create_silos import create_silos
-    except ImportError:
-        import sys
-        import os
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from modules.analyze import analyze_file
-        from modules.create_silos import create_silos
+from modules.analyze import analyze_file
+from modules.create_silos import create_silos
+from modules.config import CONFIG
 
 
 nltk.download('wordnet', quiet=True)
 
 # Fonction de configuration simplifiée
 def load_config():
+    project_root = Path(__file__).resolve().parent.parent
     return {
-        'output_dir': os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'output')),
-        'data_dir': os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data')),
-        'silos_dir': os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'output', 'silos'))
+        'output_dir': project_root / 'data' / 'output',
+        'data_dir': project_root / 'data',
+        'silos_dir': project_root / 'data' / 'output' / 'silos',
     }
 
 config = load_config()
@@ -350,88 +340,87 @@ def mix_files(composted_files, output_path):
     print(f"Taille du fichier de sortie: {len(mixed_data)} octets")
 
 def compost_process(analysis_results_path):
+    analysis_results_path = Path(analysis_results_path)
     with open(analysis_results_path, 'r') as f:
         file_data = json.load(f)
-    
+
     start_time = time.time()
     composted_files = []
-    
-    output_dir = os.path.join(os.path.dirname(analysis_results_path), 'composted')
-    os.makedirs(output_dir, exist_ok=True)
-    
+
+    output_dir = analysis_results_path.parent / 'composted'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     for file_info in file_data:
         composted_file = compost_file(file_info, output_dir)
         if composted_file:
             composted_files.append(composted_file)
-        
+
         if time.time() - start_time > 55:
             break
-    
-    output_path = os.path.join(output_dir, 'mixed_compost.bin')
+
+    output_path = output_dir / 'mixed_compost.bin'
     mix_files(composted_files, output_path)
 
     print(f"Composting process completed in {time.time() - start_time} seconds")
-    
-    return output_path
+
+    return str(output_path)
 
 def compost_file(file_info, output_dir):
-    file_path = file_info['common_metadata']['path']
-    file_name = os.path.basename(file_path)
+    output_dir = Path(output_dir)
+    file_path = Path(file_info['common_metadata']['path'])
+    file_name = file_path.name
     file_type = file_info['category'].lower()
-    
-    # Créer le dossier de sortie s'il n'existe pas
-    os.makedirs(output_dir, exist_ok=True)
-    
-    composted_path = os.path.join(output_dir, f"composted_{file_name}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    composted_path = output_dir / f"composted_{file_name}"
     
     cn_ratio = file_info['cn_data']['normalized_cn_ratio']
     intensity = min(cn_ratio / 30, 1)
 
     try:
         if file_type in ['image', 'document']:
-            saliency_path = file_info.get('additional_data', {}).get('saliency_map_gray', '')
-            
-            if os.path.exists(saliency_path):
-                saliency_map = cv2.imread(saliency_path, cv2.IMREAD_GRAYSCALE)
+            saliency_path = Path(file_info.get('additional_data', {}).get('saliency_map_gray', ''))
+
+            if saliency_path.exists():
+                saliency_map = cv2.imread(str(saliency_path), cv2.IMREAD_GRAYSCALE)
             else:
                 print(f"Création d'une carte de saillance pour {file_path}")
-                saliency_map = create_simple_saliency_map(file_path)
-            
+                saliency_map = create_simple_saliency_map(str(file_path))
+
             # Vérifier que la carte de saillance est valide
             if saliency_map is None or saliency_map.size == 0:
                 saliency_map = np.ones((100, 100), dtype=np.uint8) * 128  # Carte par défaut
 
             if file_type == 'image':
-                img = pixelate_image(file_path, saliency_map, intensity)
-                
+                img = pixelate_image(str(file_path), saliency_map, intensity)
+
                 try:
-                    # Pour les JPG, PNG, etc., sauvegarder en JPEG avec qualité réduite 
-                    if composted_path.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.tiff')):
+                    # Pour les JPG, PNG, etc., sauvegarder en JPEG avec qualité réduite
+                    if composted_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}:
                         # Assurer que l'extension est .jpg pour compression
-                        base_name = os.path.splitext(composted_path)[0]
-                        composted_path = base_name + '.jpg'
-                        img.save(composted_path, 'JPEG', quality=70)
+                        composted_path = composted_path.with_suffix('.jpg')
+                        img.save(str(composted_path), 'JPEG', quality=70)
                     else:
                         # Pour les autres formats, sauvegarder tel quel
-                        img.save(composted_path)
-                    
+                        img.save(str(composted_path))
+
                     print(f"Image compostée sauvegardée: {composted_path}")
-                    
+
                     # Vérifier la taille avant/après
-                    original_size = os.path.getsize(file_path)
-                    new_size = os.path.getsize(composted_path)
+                    original_size = file_path.stat().st_size
+                    new_size = composted_path.stat().st_size
                     reduction = (1 - new_size / original_size) * 100 if original_size > 0 else 0
                     print(f"Réduction de taille: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
-                    
+
                 except Exception as e:
                     print(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
                     # Essayer une approche alternative en cas d'erreur
                     try:
-                        img.convert('RGB').save(composted_path, 'JPEG', quality=70)
+                        img.convert('RGB').save(str(composted_path), 'JPEG', quality=70)
                         print(f"Sauvegarde de secours réussie: {composted_path}")
                     except Exception as e2:
                         print(f"Échec de la sauvegarde alternative: {str(e2)}")
-                
+
             else:  # document
                 # Pour les documents, on les traite comme du texte
                 with open(file_path, 'r', errors='ignore') as f:
@@ -439,13 +428,13 @@ def compost_file(file_info, output_dir):
                 new_text = replace_words(text, intensity)
                 with open(composted_path, 'w') as f:
                     f.write(new_text)
-        
+
         elif file_type == 'video':
             try:
-                cap = cv2.VideoCapture(file_path)
+                cap = cv2.VideoCapture(str(file_path))
                 if not cap.isOpened():
                     raise Exception("Unable to open video file")
-                    
+
                 # Lire la dernière image de la vidéo
                 last_frame = None
                 while True:
@@ -453,27 +442,26 @@ def compost_file(file_info, output_dir):
                     if not ret:
                         break
                     last_frame = frame.copy()
-                
+
                 if last_frame is not None:
                     # Sauvegarder l'image extraite avec extension .jpg
-                    output_path = composted_path + ".jpg"
-                    cv2.imwrite(output_path, last_frame)
-                    composted_path = output_path
+                    composted_path = composted_path.with_suffix(composted_path.suffix + '.jpg')
+                    cv2.imwrite(str(composted_path), last_frame)
                     print(f"Image extraite de la vidéo et sauvegardée: {composted_path}")
                 else:
                     raise Exception("Impossible d'extraire des images de la vidéo")
-                    
+
                 cap.release()
-                return composted_path
+                return str(composted_path)
             except Exception as e:
                 print(f"Error processing video {file_path}: {str(e)}")
                 return None
-        
+
         elif file_type in ['audio', 'creative', 'hidden']:
             # Pour ces types, on copie simplement le fichier
             import shutil
-            shutil.copy2(file_path, composted_path)
-        
+            shutil.copy2(str(file_path), str(composted_path))
+
         else:
             print(f"Warning: Unsupported file type: {file_type}")
             return None
@@ -481,25 +469,25 @@ def compost_file(file_info, output_dir):
     except Exception as e:
         print(f"Error composting file {file_path}: {str(e)}")
         return None
-    
-    if os.path.exists(composted_path):
-        file_size = os.path.getsize(composted_path)
+
+    if composted_path.exists():
+        file_size = composted_path.stat().st_size
         original_size = file_info['common_metadata']['size']
         if file_size > 0:
             # Si le fichier composté est plus grand que l'original, le redimensionner davantage
             if file_type == 'image' and file_size > original_size * 0.8:
                 try:
-                    img = Image.open(composted_path)
+                    img = Image.open(str(composted_path))
                     width, height = img.size
                     # Redimensionner de 50% supplémentaires
                     img = img.resize((width//2, height//2), Image.LANCZOS)
-                    img.save(composted_path, 'JPEG', quality=60)
+                    img.save(str(composted_path), 'JPEG', quality=60)
                     print(f"Redimensionnement supplémentaire appliqué à {composted_path}")
                 except Exception as e:
                     print(f"Erreur lors du redimensionnement supplémentaire: {str(e)}")
-            
+
             print(f"Fichier composté créé avec succès: {composted_path} ({file_size} octets)")
-            return composted_path
+            return str(composted_path)
         else:
             print(f"Erreur: Le fichier composté est vide: {composted_path}")
             return None
@@ -514,7 +502,7 @@ def create_dummy_saliency_map(height, width):
 
 def guess_file_type(filename):
     # Implémentez cette fonction pour déterminer le type de fichier basé sur son extension
-    ext = os.path.splitext(filename)[1].lower()
+    ext = Path(filename).suffix.lower()
     if ext in ['.jpg', '.jpeg', '.png', '.gif']:
         return 'image'
     elif ext in ['.mp4', '.avi', '.mov']:
@@ -525,9 +513,9 @@ def guess_file_type(filename):
         return 'unknown'
 
 if __name__ == "__main__":
-    silo_data_path = os.path.join(config['silos_dir'], 'silo_info.json')
+    silo_data_path = config['silos_dir'] / 'silo_info.json'
     print(f"Silo data path: {silo_data_path}")
-    if os.path.exists(silo_data_path):
+    if silo_data_path.exists():
         print("Silo info file found.")
     else:
         print("Silo info file not found!")

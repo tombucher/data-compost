@@ -1,7 +1,6 @@
 import pygame
 import math
 import random
-import os
 import sys
 import numpy as np
 from pathlib import Path
@@ -294,10 +293,10 @@ class BinaryVisualizer:
 
     def save_screenshot(self) -> None:
         """Sauvegarde une capture d'écran"""
-        if not os.path.exists("screenshots"):
-            os.makedirs("screenshots")
-        filename = f"screenshots/binary_vis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        pygame.image.save(self.data_screen, filename)
+        screenshots_dir = Path("screenshots")
+        screenshots_dir.mkdir(exist_ok=True)
+        filename = screenshots_dir / f"binary_vis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        pygame.image.save(self.data_screen, str(filename))
         print(f"Screenshot saved: {filename}")
 
 if __name__ == "__main__":

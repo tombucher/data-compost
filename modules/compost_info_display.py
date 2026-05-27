@@ -2,10 +2,10 @@
 
 import pygame
 import json
-import os
 import sys
 import logging
 import traceback
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -58,19 +58,20 @@ class EPaperVisualizer:
     def load_data(self, cn_results_path, silo_info_path=None):
         """Charge les données des fichiers JSON."""
         try:
-            logging.info(f"Chargement des données depuis {cn_results_path}")
-            if not os.path.exists(cn_results_path):
-                logging.error(f"Le fichier {cn_results_path} n'existe pas")
+            cn_results_path = Path(cn_results_path)
+            logger.info(f"Chargement des données depuis {cn_results_path}")
+            if not cn_results_path.exists():
+                logger.error(f"Le fichier {cn_results_path} n'existe pas")
                 return False
-                
+
             with open(cn_results_path, 'r') as f:
                 self.cn_data = json.load(f)
-                
+
             # Calculer les statistiques
             self._calculate_statistics()
-                
-            if silo_info_path and os.path.exists(silo_info_path):
-                logging.info(f"Chargement des données de silos depuis {silo_info_path}")
+
+            if silo_info_path and Path(silo_info_path).exists():
+                logger.info(f"Chargement des données de silos depuis {silo_info_path}")
                 with open(silo_info_path, 'r') as f:
                     self.silo_data = json.load(f)
             

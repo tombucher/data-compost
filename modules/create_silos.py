@@ -1,6 +1,7 @@
 import json
-import os
 import logging
+from pathlib import Path
+
 import numpy as np
 from collections import defaultdict
 
@@ -12,6 +13,7 @@ TARGET_CN_RATIO = CONFIG.pipeline.target_cn_ratio
 SILO_SIZE_LIMIT = CONFIG.pipeline.silo_size_limit
 
 def create_silos(cn_results_path, target_cn_ratio=TARGET_CN_RATIO):
+    cn_results_path = Path(cn_results_path)
     with open(cn_results_path, 'r') as f:
         files_data = json.load(f)
     
@@ -54,49 +56,45 @@ def create_silos(cn_results_path, target_cn_ratio=TARGET_CN_RATIO):
     balanced_silos = balance_silos(silos, target_cn_ratio)
     
     # Créer les dossiers de silos et les liens symboliques
-    base_silo_path = os.path.join(os.path.dirname(cn_results_path), 'silos')
-    os.makedirs(base_silo_path, exist_ok=True)
-    
+    base_silo_path = cn_results_path.parent / 'silos'
+    base_silo_path.mkdir(parents=True, exist_ok=True)
+
     silo_info = []
     for silo_id, silo_files in enumerate(balanced_silos, 1):
-        silo_path = os.path.join(base_silo_path, f'silo_{silo_id}')
-        os.makedirs(silo_path, exist_ok=True)
-        
+        silo_path = base_silo_path / f'silo_{silo_id}'
+        silo_path.mkdir(parents=True, exist_ok=True)
+
         total_size = sum(file['common_metadata']['size'] for file in silo_files)
         total_normalized_cn = sum(file['cn_data']['normalized_cn_ratio'] for file in silo_files)
         avg_normalized_cn = total_normalized_cn / len(silo_files)
-        
+
         for file in silo_files:
-            source_path = file['common_metadata']['path']
-            dest_path = os.path.join(silo_path, os.path.basename(source_path))
+            source_path = Path(file['common_metadata']['path'])
+            dest_path = silo_path / source_path.name
             try:
-                # Vérifier si le lien symbolique existe déjà
-                if os.path.exists(dest_path):
-                    # Si on veut remplacer le lien existant, on le supprime d'abord
-                    os.remove(dest_path)
-                    
-                # Créer le lien symbolique
-                os.symlink(source_path, dest_path)
-                logging.info(f"Lien symbolique créé de {source_path} vers {dest_path}")
+                if dest_path.exists() or dest_path.is_symlink():
+                    dest_path.unlink()
+
+                dest_path.symlink_to(source_path)
+                logger.info(f"Lien symbolique créé de {source_path} vers {dest_path}")
             except FileExistsError:
-                # Si le lien existe déjà, on l'ignore simplement (option alternative)
-                logging.info(f"Le lien symbolique existe déjà: {dest_path}")
+                logger.info(f"Le lien symbolique existe déjà: {dest_path}")
             except Exception as e:
-                logging.error(f"Erreur lors de la création du lien symbolique de {source_path}: {str(e)}")
-        
+                logger.error(f"Erreur lors de la création du lien symbolique de {source_path}: {str(e)}")
+
         silo_info.append({
             'silo_id': silo_id,
             'file_count': len(silo_files),
             'total_size': total_size,
             'avg_normalized_cn_ratio': avg_normalized_cn
         })
-    
-    output_path = os.path.join(base_silo_path, 'silo_info.json')
+
+    output_path = base_silo_path / 'silo_info.json'
     with open(output_path, 'w') as f:
         json.dump(silo_info, f, indent=4)
-    
-    logging.info(f"Informations sur les silos exportées vers {output_path}")
-    return output_path
+
+    logger.info(f"Informations sur les silos exportées vers {output_path}")
+    return str(output_path)
 
 def balance_silos(silos, target_ratio):
     balanced_silos = []
@@ -124,5 +122,5 @@ def main(input_path):
     return create_silos(input_path)
 
 if __name__ == "__main__":
-    input_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'analysis_results.json'))
+    input_path = (Path(__file__).resolve().parent.parent.parent / 'data' / 'analysis_results.json')
     main(input_path)
