@@ -55,7 +55,7 @@ def check_system_requirements():
         'create_silos.py',
         'transformation.py',
         'compost_info_display.py',
-        'vizualize-bin.py',
+        'visualize_bin.py',
     ]
 
     for module_name in required_modules:

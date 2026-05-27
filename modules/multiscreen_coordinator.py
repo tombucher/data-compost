@@ -256,10 +256,10 @@ class CompostVisualizer:
         
         try:
             # Lancer le visualiseur de compost dans un processus séparé
-            visualizer_script = Path(__file__).parent / 'modules' / 'vizualize-bin.py'
+            visualizer_script = Path(__file__).parent / 'modules' / 'visualize_bin.py'
             
             if not visualizer_script.exists():
-                visualizer_script = Path('modules') / 'vizualize-bin.py'
+                visualizer_script = Path('modules') / 'visualize_bin.py'
             
             if not visualizer_script.exists():
                 raise FileNotFoundError(f"Le script visualiseur n'existe pas: {visualizer_script}")

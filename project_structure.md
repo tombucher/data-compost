@@ -15,7 +15,7 @@ data-compost/
 │   ├── transformation.py       # Processus de "compostage" des fichiers
 │   ├── compost_info_display.py # Affichage des informations sur l'écran e-paper
 │   ├── file_analysis_visualization.py # Visualisation pour l'analyse des fichiers
-│   └── vizualize-bin.py        # Visualisation du fichier binaire final
+│   └── visualize_bin.py        # Visualisation du fichier binaire final
 ├── displays/                   # Modules d'affichage pour les différents écrans
 │   ├── __init__.py             # Rend le dossier un package Python
 │   ├── circular_display.py     # Affichage pour l'écran circulaire

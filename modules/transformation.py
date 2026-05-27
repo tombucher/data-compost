@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 import random
 from pathlib import Path
@@ -14,6 +15,7 @@ from modules.analyze import analyze_file
 from modules.create_silos import create_silos
 from modules.config import CONFIG
 
+logger = logging.getLogger(__name__)
 
 nltk.download('wordnet', quiet=True)
 
@@ -51,7 +53,7 @@ def create_simple_saliency_map(image_path):
         
         return result
     except Exception as e:
-        print(f"Erreur lors de la création d'une carte de saillance simple: {e}")
+        logger.error(f"Erreur lors de la création d'une carte de saillance simple: {e}")
         return np.ones((100, 100), dtype=np.uint8) * 128  # Valeur par défaut
 
 def pixelate_image(image_path, saliency_map, intensity):
@@ -65,7 +67,7 @@ def pixelate_image(image_path, saliency_map, intensity):
         
         # Vérifier que l'image est correctement chargée
         if img_array.size == 0:
-            print(f"Erreur: Image vide pour {image_path}")
+            logger.error(f"Erreur: Image vide pour {image_path}")
             return img  # Retourner l'image originale
         
         # Dimensions de l'image
@@ -95,7 +97,7 @@ def pixelate_image(image_path, saliency_map, intensity):
                 saliency_hsv = cv2.cvtColor(saliency_color, cv2.COLOR_BGR2HSV)
                 
             except Exception as e:
-                print(f"Erreur lors de la préparation de la carte de saillance: {e}")
+                logger.error(f"Erreur lors de la préparation de la carte de saillance: {e}")
                 saliency_color = np.zeros((height, width, 3), dtype=np.uint8)
                 saliency_hsv = np.zeros((height, width, 3), dtype=np.uint8)
         else:
@@ -283,14 +285,14 @@ def pixelate_image(image_path, saliency_map, intensity):
         return result_img
         
     except Exception as e:
-        print(f"Erreur lors de la transformation de l'image {image_path}: {str(e)}")
+        logger.error(f"Erreur lors de la transformation de l'image {image_path}: {str(e)}")
         import traceback
         traceback.print_exc()
         # En cas d'échec, retourner l'image originale
         try:
             return Image.open(image_path)
         except:
-            print(f"Impossible de charger l'image originale {image_path}")
+            logger.error(f"Impossible de charger l'image originale {image_path}")
             return Image.new('RGB', (100, 100), color=(0, 0, 0))
 
 
@@ -330,18 +332,15 @@ def mix_files(composted_files, output_path):
             with open(file, 'rb') as f:
                 mixed_data += f.read()
         except FileNotFoundError:
-            print(f"Fichier non trouvé: {file}")
+            logger.info(f"Fichier non trouvé: {file}")
         except Exception as e:
-            print(f"Erreur lors de la lecture du fichier {file}: {str(e)}")
-    
+            logger.error(f"Erreur lors de la lecture du fichier {file}: {str(e)}")
     if not mixed_data:
-        print("Attention: Aucune donnée à écrire dans le fichier de sortie.")
-    
+        logger.warning("Attention: Aucune donnée à écrire dans le fichier de sortie.")
     with open(output_path, 'wb') as f:
         f.write(mixed_data)
     
-    print(f"Taille du fichier de sortie: {len(mixed_data)} octets")
-
+    logger.info(f"Taille du fichier de sortie: {len(mixed_data)} octets")
 def compost_process(analysis_results_path):
     """Orchestre la 'décomposition' : itère sur les fichiers, applique compost_file à chacun, puis mix_files. Renvoie le chemin du binaire final."""
     analysis_results_path = Path(analysis_results_path)
@@ -365,8 +364,7 @@ def compost_process(analysis_results_path):
     output_path = output_dir / 'mixed_compost.bin'
     mix_files(composted_files, output_path)
 
-    print(f"Composting process completed in {time.time() - start_time} seconds")
-
+    logger.info(f"Composting process completed in {time.time() - start_time} seconds")
     return str(output_path)
 
 def compost_file(file_info, output_dir):
@@ -389,7 +387,7 @@ def compost_file(file_info, output_dir):
             if saliency_path.exists():
                 saliency_map = cv2.imread(str(saliency_path), cv2.IMREAD_GRAYSCALE)
             else:
-                print(f"Création d'une carte de saillance pour {file_path}")
+                logger.info(f"Création d'une carte de saillance pour {file_path}")
                 saliency_map = create_simple_saliency_map(str(file_path))
 
             # Vérifier que la carte de saillance est valide
@@ -409,23 +407,20 @@ def compost_file(file_info, output_dir):
                         # Pour les autres formats, sauvegarder tel quel
                         img.save(str(composted_path))
 
-                    print(f"Image compostée sauvegardée: {composted_path}")
-
+                    logger.info(f"Image compostée sauvegardée: {composted_path}")
                     # Vérifier la taille avant/après
                     original_size = file_path.stat().st_size
                     new_size = composted_path.stat().st_size
                     reduction = (1 - new_size / original_size) * 100 if original_size > 0 else 0
-                    print(f"Réduction de taille: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
-
+                    logger.info(f"Réduction de taille: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
                 except Exception as e:
-                    print(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
+                    logger.error(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
                     # Essayer une approche alternative en cas d'erreur
                     try:
                         img.convert('RGB').save(str(composted_path), 'JPEG', quality=70)
-                        print(f"Sauvegarde de secours réussie: {composted_path}")
+                        logger.info(f"Sauvegarde de secours réussie: {composted_path}")
                     except Exception as e2:
-                        print(f"Échec de la sauvegarde alternative: {str(e2)}")
-
+                        logger.error(f"Échec de la sauvegarde alternative: {str(e2)}")
             else:  # document
                 # Pour les documents, on les traite comme du texte
                 with open(file_path, 'r', errors='ignore') as f:
@@ -452,14 +447,14 @@ def compost_file(file_info, output_dir):
                     # Sauvegarder l'image extraite avec extension .jpg
                     composted_path = composted_path.with_suffix(composted_path.suffix + '.jpg')
                     cv2.imwrite(str(composted_path), last_frame)
-                    print(f"Image extraite de la vidéo et sauvegardée: {composted_path}")
+                    logger.info(f"Image extraite de la vidéo et sauvegardée: {composted_path}")
                 else:
                     raise Exception("Impossible d'extraire des images de la vidéo")
 
                 cap.release()
                 return str(composted_path)
             except Exception as e:
-                print(f"Error processing video {file_path}: {str(e)}")
+                logger.error(f"Error processing video {file_path}: {str(e)}")
                 return None
 
         elif file_type in ['audio', 'creative', 'hidden']:
@@ -468,11 +463,11 @@ def compost_file(file_info, output_dir):
             shutil.copy2(str(file_path), str(composted_path))
 
         else:
-            print(f"Warning: Unsupported file type: {file_type}")
+            logger.warning(f"Warning: Unsupported file type: {file_type}")
             return None
 
     except Exception as e:
-        print(f"Error composting file {file_path}: {str(e)}")
+        logger.error(f"Error composting file {file_path}: {str(e)}")
         return None
 
     if composted_path.exists():
@@ -487,17 +482,16 @@ def compost_file(file_info, output_dir):
                     # Redimensionner de 50% supplémentaires
                     img = img.resize((width//2, height//2), Image.LANCZOS)
                     img.save(str(composted_path), 'JPEG', quality=60)
-                    print(f"Redimensionnement supplémentaire appliqué à {composted_path}")
+                    logger.info(f"Redimensionnement supplémentaire appliqué à {composted_path}")
                 except Exception as e:
-                    print(f"Erreur lors du redimensionnement supplémentaire: {str(e)}")
-
-            print(f"Fichier composté créé avec succès: {composted_path} ({file_size} octets)")
+                    logger.error(f"Erreur lors du redimensionnement supplémentaire: {str(e)}")
+            logger.info(f"Fichier composté créé avec succès: {composted_path} ({file_size} octets)")
             return str(composted_path)
         else:
-            print(f"Erreur: Le fichier composté est vide: {composted_path}")
+            logger.error(f"Erreur: Le fichier composté est vide: {composted_path}")
             return None
     else:
-        print(f"Erreur: Le fichier composté n'a pas été créé: {composted_path}")
+        logger.error(f"Erreur: Le fichier composté n'a pas été créé: {composted_path}")
         return None
 
 
@@ -519,9 +513,9 @@ def guess_file_type(filename):
 
 if __name__ == "__main__":
     silo_data_path = config['silos_dir'] / 'silo_info.json'
-    print(f"Silo data path: {silo_data_path}")
+    logger.info(f"Silo data path: {silo_data_path}")
     if silo_data_path.exists():
-        print("Silo info file found.")
+        logger.info("Silo info file found.")
     else:
-        print("Silo info file not found!")
+        logger.info("Silo info file not found!")
     compost_process(silo_data_path)

@@ -8,9 +8,13 @@ le processus principal pour un fichier unifié.
 
 import logging
 import multiprocessing
-from logging.handlers import QueueHandler, QueueListener
+from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 
 LOG_FORMAT = "%(asctime)s - %(processName)s - %(name)s - %(levelname)s - %(message)s"
+
+# Rotation : 5 Mo par fichier, 3 archives conservées (.log.1, .log.2, .log.3)
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUP_COUNT = 3
 
 
 def setup_main_logging(log_path="compost_process.log", level=logging.INFO):
@@ -18,13 +22,16 @@ def setup_main_logging(log_path="compost_process.log", level=logging.INFO):
 
     Returns (log_queue, listener). L'appelant doit garder une référence au
     listener et appeler listener.stop() en fin de vie pour flusher proprement.
+    Le fichier de log est rotaté automatiquement (5 Mo × 3 archives).
     """
     formatter = logging.Formatter(LOG_FORMAT)
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler(str(log_path))
+    file_handler = RotatingFileHandler(
+        str(log_path), maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT
+    )
     file_handler.setFormatter(formatter)
 
     root = logging.getLogger()

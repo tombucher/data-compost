@@ -43,16 +43,20 @@ except ImportError as _blip_import_error:
 
 logger = logging.getLogger(__name__)
 
-# Liste des ressources à vérifier
-resources = ['tokenizers/punkt', 'taggers/averaged_perceptron_tagger', 'sentiment/vader_lexicon']
+_NLTK_RESOURCES = ['tokenizers/punkt', 'taggers/averaged_perceptron_tagger', 'sentiment/vader_lexicon']
 
-for resource in resources:
-    try:
-        find(resource)
-        print(f"{resource} already installed.")
-    except LookupError:
-        print(f"Downloading {resource}...")
-        nltk.download(resource.split('/')[-1])
+
+def _ensure_nltk_data():
+    """Télécharge à la demande les corpus NLTK manquants. Idempotent et silencieux si tout est déjà là."""
+    for resource in _NLTK_RESOURCES:
+        try:
+            find(resource)
+        except LookupError:
+            logger.info(f"Téléchargement de la ressource NLTK: {resource}")
+            nltk.download(resource.split('/')[-1], quiet=True)
+
+
+_ensure_nltk_data()
 
 
 # Catégories de fichiers
