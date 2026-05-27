@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+compost_process.log
+
+# Outputs générés par le pipeline
+data/output/
+data/test/saliency_maps/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# NLTK / modèles téléchargés
+nltk_data/
