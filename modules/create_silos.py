@@ -13,6 +13,12 @@ TARGET_CN_RATIO = CONFIG.pipeline.target_cn_ratio
 SILO_SIZE_LIMIT = CONFIG.pipeline.silo_size_limit
 
 def create_silos(cn_results_path, target_cn_ratio=TARGET_CN_RATIO):
+    """Regroupe les fichiers analysés en silos équilibrés par ratio C/N et taille.
+
+    Lit le JSON pointé par `cn_results_path`, crée des sous-dossiers `silo_N`
+    via liens symboliques, et écrit un `silo_info.json` listant les
+    statistiques de chaque silo. Renvoie le chemin de `silo_info.json`.
+    """
     cn_results_path = Path(cn_results_path)
     with open(cn_results_path, 'r') as f:
         files_data = json.load(f)
@@ -97,6 +103,7 @@ def create_silos(cn_results_path, target_cn_ratio=TARGET_CN_RATIO):
     return str(output_path)
 
 def balance_silos(silos, target_ratio):
+    """Pour chaque silo dont la moyenne C/N s'éloigne de plus de 5 du target, le coupe en deux moitiés triées."""
     balanced_silos = []
     for silo in silos:
         if len(silo) < 2:

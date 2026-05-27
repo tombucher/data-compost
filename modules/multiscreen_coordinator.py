@@ -13,6 +13,7 @@ logger = logging.getLogger("CompostCoordinator")
 
 # Définition des phases du processus
 class CompostPhase(Enum):
+    """Les 5 phases ordonnées du pipeline de compostage, du démarrage à la visualisation finale."""
     IDLE = 0
     FILE_ANALYSIS = 1
     CN_CALCULATION = 2

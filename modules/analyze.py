@@ -79,6 +79,7 @@ def numpy_to_python(obj):
     raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
 
 def get_file_category(file_path):
+    """Retourne la catégorie ('image', 'audio', ...) d'après l'extension du fichier, 'hidden' si le nom débute par '.', ou None si inconnu."""
     p = Path(file_path)
     ext = p.suffix.lower()
 
@@ -95,6 +96,7 @@ def get_file_category(file_path):
 
 
 def get_common_metadata(file_path):
+    """Extrait les métadonnées système communes à tous les types (taille, dates, mime, permissions, owner)."""
     p = Path(file_path)
     stat_info = p.stat()
     mime_type, _ = mimetypes.guess_type(str(p))
@@ -120,6 +122,7 @@ def create_heatmap(saliency_map, alpha=0.5):
     return cv2.addWeighted(heatmap, alpha, cv2.cvtColor(saliency_map, cv2.COLOR_GRAY2BGR), 1 - alpha, 0)
 
 def analyze_image(file_path):
+    """Analyse une image : dimensions, format, carte de saillance (gray/color/raw), couleurs dominantes, qualité, OCR."""
     file_path = Path(file_path)
     ext = file_path.suffix
     if ext.lower() == '.svg':
@@ -255,6 +258,7 @@ def calculate_num_frames(duration):
 
 # Fonction principale d'analyse vidéo
 def analyze_video(file_path):
+    """Analyse une vidéo : durée, fps, dimensions, et descriptions de frames clés (via BLIP si disponible)."""
     with VideoFileClip(file_path) as video:
         # Extraire les métadonnées de la vidéo
         duration = video.duration
@@ -298,6 +302,7 @@ def analyze_video(file_path):
 
 
 def analyze_audio(file_path):
+    """Analyse un fichier audio : durée, sample rate, tempo, genre estimé."""
     try:
         # Essayer avec librosa si disponible
         import librosa
@@ -351,6 +356,7 @@ def analyze_audio(file_path):
         }
 
 def analyze_document(file_path):
+    """Analyse un document (PDF/DOCX/texte) : aperçu, nombre de mots/caractères, langue, sentiment."""
     file_path = Path(file_path)
     ext = file_path.suffix
     if ext.lower() == '.pdf':
@@ -395,6 +401,7 @@ def analyze_document(file_path):
     }
 
 def analyze_file(file_path):
+    """Point d'entrée par fichier : route vers analyze_image/video/audio/document selon la catégorie, retourne None pour les fichiers ignorés."""
     category = get_file_category(file_path)
     
     # Si la catégorie est None, on ignore le fichier
@@ -428,6 +435,7 @@ def count_files(directory):
     return sum(1 for _ in Path(directory).rglob('*') if _.is_file())
 
 def analyze_directory(directory, visualization_queue=None):
+    """Analyse récursivement tous les fichiers d'un répertoire en parallèle. Publie les résultats sur visualization_queue si fournie. Renvoie le chemin du JSON d'analyses."""
     results = []
     directory = Path(directory)
     files_to_analyze = [p for p in directory.rglob('*') if p.is_file()]

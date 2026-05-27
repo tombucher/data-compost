@@ -55,6 +55,7 @@ def create_simple_saliency_map(image_path):
         return np.ones((100, 100), dtype=np.uint8) * 128  # Valeur par défaut
 
 def pixelate_image(image_path, saliency_map, intensity):
+    """Pixelise une image avec une taille de bloc modulée par la saillance et l'intensité (0-1)."""
     try:
         # Ouvrir l'image avec PIL
         img = Image.open(image_path)
@@ -312,6 +313,7 @@ def simple_datamosh(video_path, saliency_map, intensity):
     return frames
 
 def replace_words(text, intensity):
+    """Remplace une fraction des mots du texte par des synonymes WordNet, proportionnelle à intensity (0-1)."""
     words = text.split()
     for i, word in enumerate(words):
         if random.random() < intensity:
@@ -321,6 +323,7 @@ def replace_words(text, intensity):
     return ' '.join(words)
 
 def mix_files(composted_files, output_path):
+    """Concatène byte-à-byte tous les fichiers compostés vers un unique fichier binaire de sortie (mixed_compost.bin)."""
     mixed_data = b''
     for file in composted_files:
         try:
@@ -340,6 +343,7 @@ def mix_files(composted_files, output_path):
     print(f"Taille du fichier de sortie: {len(mixed_data)} octets")
 
 def compost_process(analysis_results_path):
+    """Orchestre la 'décomposition' : itère sur les fichiers, applique compost_file à chacun, puis mix_files. Renvoie le chemin du binaire final."""
     analysis_results_path = Path(analysis_results_path)
     with open(analysis_results_path, 'r') as f:
         file_data = json.load(f)
@@ -366,6 +370,7 @@ def compost_process(analysis_results_path):
     return str(output_path)
 
 def compost_file(file_info, output_dir):
+    """Applique la transformation adaptée au type (pixelation image / extraction frame vidéo / remplacement mots / copie). Renvoie le chemin du fichier composté ou None."""
     output_dir = Path(output_dir)
     file_path = Path(file_info['common_metadata']['path'])
     file_name = file_path.name

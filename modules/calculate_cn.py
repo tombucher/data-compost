@@ -13,6 +13,7 @@ BROWN_CATEGORIES = ["system", "compressed", "executable", "hidden"]
 GREEN_CATEGORIES = ["image", "audio", "video", "text", "document", "creative"]
 
 def determine_file_type(file_data):
+    """Classe un fichier en 'brown' (carboné), 'green' (azoté) ou 'unknown' selon sa catégorie."""
     category = file_data['category']
     name = file_data['common_metadata']['name']
     
@@ -28,11 +29,13 @@ def determine_file_type(file_data):
         return "unknown"
 
 def calculate_age_factor(file_data):
+    """Renvoie un facteur dans (0, 1] : ~1 pour un fichier récent, → 0 pour un fichier ancien (décroissance exp sur 1 an)."""
     modified_time = datetime.fromisoformat(file_data['common_metadata']['modified_at'])
     age = (datetime.now() - modified_time).days
     return np.exp(-age / 365)  # Plus le fichier est vieux, plus le facteur est proche de 0
 
 def calculate_base_cn(file_data):
+    """Calcule (carbone, azote) bruts à partir des métadonnées spécifiques au type de média."""
     category = file_data['category']
     size = file_data['common_metadata']['size']
     
@@ -81,6 +84,11 @@ def calculate_base_cn(file_data):
     return carbon, nitrogen
 
 def calculate_cn_ratio(file_data):
+    """Calcule le ratio C/N d'un fichier en pondérant carbone/azote par son type et son âge.
+
+    Renvoie un dict avec file_type, carbon, nitrogen, raw_cn_ratio et normalized_cn_ratio.
+    Le file_type final est reclassé selon la dominance C vs N effective.
+    """
     file_type = determine_file_type(file_data)
     age_factor = calculate_age_factor(file_data)
     base_carbon, base_nitrogen = calculate_base_cn(file_data)
@@ -114,6 +122,7 @@ def calculate_cn_ratio(file_data):
     }
 
 def normalize_cn_ratio(raw_ratio, min_value=1, max_value=100, decimals=0):
+    """Normalise un ratio C/N brut sur l'échelle [min_value, max_value] via log10 (saturée à [0.01, 1000])."""
     if raw_ratio <= 0:
         return min_value
     
@@ -135,6 +144,10 @@ def normalize_cn_ratio(raw_ratio, min_value=1, max_value=100, decimals=0):
     return round(result, decimals)
 
 def calculate_cn(input_path):
+    """Lit un fichier d'analyses JSON, calcule le ratio C/N par fichier et réécrit le résultat sur place.
+
+    Renvoie le chemin d'entrée pour chaînage dans le pipeline.
+    """
     with open(input_path, 'r') as f:
         analysis_results = json.load(f)
     
