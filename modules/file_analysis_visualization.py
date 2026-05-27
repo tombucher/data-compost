@@ -43,7 +43,9 @@ def draw_progress_bar(progress):
     pygame.draw.rect(screen, (100, 100, 100), (x, y, bar_width, bar_height))
     pygame.draw.rect(screen, (200, 200, 200), (x, y, int(bar_width * progress), bar_height))
 
-def start_visualization(queue, update_queue, total_files, ready_queue=None):
+def start_visualization(queue, update_queue, total_files, ready_queue=None, log_queue=None):
+    from modules.logging_config import setup_worker_logging
+    setup_worker_logging(log_queue)
     files = {}
     current_file = None
     processed_files = 0

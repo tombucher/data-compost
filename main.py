@@ -15,6 +15,7 @@ from pathlib import Path
 import shutil
 from modules.usb_detector import USBDetector
 from modules.multiscreen_coordinator import CompostVisualizer, CompostPhase
+from modules.logging_config import setup_main_logging
 from threading import Event
 
 # Extensions de fichiers supportées par le pipeline d'analyse
@@ -31,15 +32,9 @@ SUPPORTED_EXTENSIONS = {
 }
 
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("compost_process.log")
-    ]
-)
+# Logging centralisé : configuré dans __main__ pour disposer de la log_queue
+# partagée avec les sous-processus. Au niveau module on récupère seulement le
+# logger nommé.
 logger = logging.getLogger("MainScript")
 
 def check_system_requirements():
@@ -189,7 +184,8 @@ def main():
     args = parse_arguments()
     visualizer = None  # Initialiser visualizer à None
     usb_detector = None  # Initialiser usb_detector à None
-    
+    log_queue, log_listener = setup_main_logging()
+
     try:
         # Vérifier les prérequis
         if not check_system_requirements():
@@ -270,7 +266,7 @@ def main():
         logger.info(f"Répertoire d'entrée: {input_directory}")
         
         # Créer et démarrer le visualiseur
-        visualizer = CompostVisualizer(input_directory)
+        visualizer = CompostVisualizer(input_directory, log_queue=log_queue)
         
         # Démarrer le processus complet
         if args.skip_displays:
@@ -315,6 +311,7 @@ def main():
             visualizer.stop_all_processes()
         if usb_detector:  # Vérifier que usb_detector existe avant d'appeler stop
             usb_detector.stop()
+        log_listener.stop()
 
 if __name__ == "__main__":
     # Configurer multiprocessing pour fonctionner correctement

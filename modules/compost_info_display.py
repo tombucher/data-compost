@@ -7,8 +7,7 @@ import sys
 import logging
 import traceback
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Constantes
 # Dimensions standard pour un écran ePaper 2.9" (296x128 pixels)

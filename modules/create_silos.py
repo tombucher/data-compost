@@ -4,7 +4,7 @@ import logging
 import numpy as np
 from collections import defaultdict
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 TARGET_CN_RATIO = 30  # Ratio C/N cible pour chaque silo
 SILO_SIZE_LIMIT = 100 * 1024 * 1024  # 1 GB, ajustez selon vos besoins

@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 import math
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Définir les catégories de fichiers bruns (carbonés) et verts (azotés)
 BROWN_CATEGORIES = ["system", "compressed", "executable", "hidden"]

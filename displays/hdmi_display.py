@@ -12,11 +12,6 @@ from collections import defaultdict
 import os
 from pathlib import Path
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger("HDMIDisplay")
 
 # Définition des phases du processus
@@ -669,14 +664,17 @@ class HDMIDisplay:
             # Appliquer une légère gravité
             particle['vy'] += 0.05
 
-def start_hdmi_display(update_queue, stop_queue):
+def start_hdmi_display(update_queue, stop_queue, log_queue=None):
     """
     Fonction principale pour démarrer l'affichage HDMI dans un processus séparé.
-    
+
     Args:
         update_queue: Queue pour recevoir les mises à jour d'état
         stop_queue: Queue pour recevoir les signaux d'arrêt
+        log_queue: Queue partagée pour le logging centralisé (optionnel)
     """
+    from modules.logging_config import setup_worker_logging
+    setup_worker_logging(log_queue)
     try:
         logger.info("Starting HDMI display process")
         

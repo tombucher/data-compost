@@ -7,8 +7,6 @@ import traceback
 import multiprocessing
 from enum import Enum
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("EPaperDisplay")
 
 # Définition des phases du processus
@@ -461,16 +459,19 @@ class EPaperVisualizer:
         finally:
             pygame.quit()
 
-def start_epaper_display(update_queue, stop_queue, cn_results_path=None, silo_info_path=None):
+def start_epaper_display(update_queue, stop_queue, cn_results_path=None, silo_info_path=None, log_queue=None):
     """
     Fonction principale pour démarrer l'affichage ePaper dans un processus séparé.
-    
+
     Args:
         update_queue: Queue pour recevoir les mises à jour d'état
         stop_queue: Queue pour recevoir les signaux d'arrêt
         cn_results_path: Chemin vers les résultats d'analyse C/N (optionnel)
         silo_info_path: Chemin vers les informations sur les silos (optionnel)
+        log_queue: Queue partagée pour le logging centralisé (optionnel)
     """
+    from modules.logging_config import setup_worker_logging
+    setup_worker_logging(log_queue)
     try:
         logging.info("Starting ePaper display process")
         

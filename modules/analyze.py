@@ -38,8 +38,7 @@ except ImportError as _blip_import_error:
         _blip_import_error,
     )
 
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Liste des ressources à vérifier
 resources = ['tokenizers/punkt', 'taggers/averaged_perceptron_tagger', 'sentiment/vader_lexicon']

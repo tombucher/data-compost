@@ -9,11 +9,6 @@ import signal
 from enum import Enum
 from pathlib import Path
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger("CompostCoordinator")
 
 # Définition des phases du processus
@@ -30,9 +25,10 @@ class CompostVisualizer:
     Coordinateur central pour le système de visualisation multiécran
     du processus de compostage numérique.
     """
-    def __init__(self, input_directory):
+    def __init__(self, input_directory, log_queue=None):
         self.input_directory = Path(input_directory)
         self.output_directory = Path('data/output')
+        self.log_queue = log_queue
         self.current_phase = CompostPhase.IDLE
         self.phase_progress = 0.0
         self.processes = {}
@@ -77,21 +73,21 @@ class CompostVisualizer:
             from displays.circular_display import start_circular_display
             self.processes['circular'] = multiprocessing.Process(
                 target=start_circular_display,
-                args=(self.queues['circular'], self.stop_queue)
+                args=(self.queues['circular'], self.stop_queue, self.log_queue)
             )
-            
+
             # Écran HDMI principal (processus Python)
             from displays.hdmi_display import start_hdmi_display
             self.processes['hdmi'] = multiprocessing.Process(
                 target=start_hdmi_display,
-                args=(self.queues['hdmi'], self.stop_queue)
+                args=(self.queues['hdmi'], self.stop_queue, self.log_queue)
             )
-            
+
             # Écran e-paper (processus Python)
             from displays.epaper_display import start_epaper_display
             self.processes['epaper'] = multiprocessing.Process(
                 target=start_epaper_display,
-                args=(self.queues['epaper'], self.stop_queue, str(self.cn_results_path), str(self.silo_info_path))
+                args=(self.queues['epaper'], self.stop_queue, str(self.cn_results_path), str(self.silo_info_path), self.log_queue)
             )
             
             # Démarrer les processus
@@ -151,7 +147,7 @@ class CompostVisualizer:
             from modules.file_analysis_visualization import start_visualization
             viz_process = multiprocessing.Process(
                 target=start_visualization,
-                args=(visualization_queue, update_queue, total_files, ready_queue)
+                args=(visualization_queue, update_queue, total_files, ready_queue, self.log_queue)
             )
             viz_process.daemon = True  # Marquer comme processus démon
             viz_process.start()

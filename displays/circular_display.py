@@ -5,11 +5,6 @@ import logging
 from enum import Enum
 import multiprocessing
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger("CircularDisplay")
 
 # Définition des phases du processus, identique à celle du coordinateur
@@ -177,14 +172,17 @@ class CircularProgressDisplay:
         # Dessiner le texte
         self.screen.blit(progress_text, text_rect)
 
-def start_circular_display(update_queue, stop_queue):
+def start_circular_display(update_queue, stop_queue, log_queue=None):
     """
     Fonction principale pour démarrer l'affichage circulaire dans un processus séparé.
-    
+
     Args:
         update_queue: Queue pour recevoir les mises à jour d'état
         stop_queue: Queue pour recevoir les signaux d'arrêt
+        log_queue: Queue partagée pour le logging centralisé (optionnel)
     """
+    from modules.logging_config import setup_worker_logging
+    setup_worker_logging(log_queue)
     try:
         logger.info("Starting circular display process")
         
