@@ -20,11 +20,28 @@ Le système utilise trois écrans différents et potentiellement une imprimante 
 
 ## Installation
 
-### Dépendances
+### Environnement virtuel
+
+Le projet utilise un environnement virtuel Python isolé (`venv/`) avec
+toutes ses dépendances. **Il faut l'activer avant chaque session** :
 
 ```bash
-pip install pygame numpy tqdm PyPDF2 python-docx nltk langdetect torch torchvision transformers opencv-python-headless
+# Première fois uniquement : créer le venv et installer les dépendances
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Ensuite, à chaque nouvelle session terminal :
+source venv/bin/activate
 ```
+
+Une fois le venv activé, `python` pointe vers l'interpréteur du venv et
+toutes les dépendances sont disponibles. Pour quitter le venv :
+`deactivate`.
+
+> Astuce : si `python: command not found` apparaît, c'est que le venv
+> n'est pas activé. Sur macOS, le système ne fournit que `python3` —
+> jamais `python`.
 
 ### Configuration matérielle 
 
@@ -41,6 +58,8 @@ Placez les fichiers à "composter" dans le dossier `data/test/` ou spécifiez un
 
 ### Exécution
 
+⚠️ Activer d'abord le venv : `source venv/bin/activate`
+
 Pour lancer le programme complet :
 ```bash
 python main.py --input data/test
@@ -55,6 +74,18 @@ Pour démarrer à une phase spécifique :
 ```bash
 python main.py --input data/test --phase 3  # Commence à la création des silos
 ```
+
+### Tests
+
+```bash
+pytest tests/
+```
+
+### Configuration
+
+Les chemins, seuils C/N et paramètres du pipeline sont centralisés dans
+[`config.toml`](config.toml) à la racine du projet. Modifier ce fichier
+plutôt que le code.
 
 ## Structure du projet
 
