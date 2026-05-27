@@ -36,3 +36,6 @@ moviepy>=1.0.3
 
 # Utilitaires
 urllib3>=2.0.0
+
+# Tests (dev)
+pytest>=8.0.0

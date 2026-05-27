@@ -30,3 +30,6 @@ data/test/saliency_maps/
 
 # NLTK / modèles téléchargés
 nltk_data/
+
+# Pytest
+.pytest_cache/
