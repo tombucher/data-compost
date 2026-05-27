@@ -16,6 +16,7 @@ import shutil
 from modules.usb_detector import USBDetector
 from modules.multiscreen_coordinator import CompostVisualizer, CompostPhase
 from modules.logging_config import setup_main_logging
+from modules.config import CONFIG
 from threading import Event
 
 # Extensions de fichiers supportées par le pipeline d'analyse
@@ -77,7 +78,7 @@ def validate_input_directory(input_dir: Path) -> bool:
         if f.is_file()
         and not f.name.startswith('.')
         and f.suffix.lower() in SUPPORTED_EXTENSIONS
-        and 'saliency_maps' not in f.parts  # exclure les artefacts d'un run précédent
+        and CONFIG.paths.saliency_subdir not in f.parts  # exclure les artefacts d'un run précédent
     ]
 
     if not usable_files:
@@ -87,7 +88,7 @@ def validate_input_directory(input_dir: Path) -> bool:
     total_size_mb = sum(f.stat().st_size for f in usable_files) / (1024 * 1024)
     logger.info(f"{len(usable_files)} fichier(s) exploitable(s) — taille totale: {total_size_mb:.1f} Mo")
 
-    if total_size_mb > 5000:
+    if total_size_mb > CONFIG.pipeline.input_size_warning_mb:
         logger.warning(f"Volume important ({total_size_mb:.1f} Mo) — l'analyse peut être longue.")
 
     return True
@@ -96,9 +97,9 @@ def validate_input_directory(input_dir: Path) -> bool:
 def setup_directories():
     """Crée les répertoires nécessaires s'ils n'existent pas"""
     directories = [
-        Path('data/output'),
-        Path('data/output/silos'),
-        Path('data/output/composted'),
+        CONFIG.paths.output_root,
+        CONFIG.paths.silos_dir,
+        CONFIG.paths.composted_dir,
     ]
 
     for directory in directories:
@@ -114,7 +115,7 @@ def parse_arguments():
     parser.add_argument(
         "--input", "-i",
         type=str,
-        default="data/test",
+        default=str(CONFIG.paths.default_input),
         help="Répertoire contenant les fichiers à composter"
     )
     
@@ -142,16 +143,17 @@ def parse_arguments():
 def clean_output_directories(input_dir: Path | None = None):
     """Nettoie les répertoires de sortie et les artefacts saliency_maps du dossier d'entrée."""
     dirs_to_clean = [
-        Path('data/output'),
-        Path('data/output/silos'),
-        Path('data/output/composted'),
+        CONFIG.paths.output_root,
+        CONFIG.paths.silos_dir,
+        CONFIG.paths.composted_dir,
     ]
 
-    # Nettoyer le dossier saliency_maps du dossier d'entrée (et fallback historique data/test)
+    # Nettoyer le dossier saliency_maps du dossier d'entrée (et fallback historique sur l'input par défaut)
+    saliency_name = CONFIG.paths.saliency_subdir
     saliency_dirs = []
     if input_dir is not None:
-        saliency_dirs.append(input_dir / 'saliency_maps')
-    saliency_dirs.append(Path('data/test/saliency_maps'))
+        saliency_dirs.append(input_dir / saliency_name)
+    saliency_dirs.append(CONFIG.paths.default_input / saliency_name)
 
     for saliency_dir in saliency_dirs:
         if saliency_dir.exists():
@@ -184,7 +186,7 @@ def main():
     args = parse_arguments()
     visualizer = None  # Initialiser visualizer à None
     usb_detector = None  # Initialiser usb_detector à None
-    log_queue, log_listener = setup_main_logging()
+    log_queue, log_listener = setup_main_logging(CONFIG.paths.log_file)
 
     try:
         # Vérifier les prérequis
@@ -211,7 +213,7 @@ def main():
                 logger.info(f"Copie des fichiers depuis la clé USB: {mount_point}")
                 
                 # Utiliser le répertoire d'entrée standard
-                input_dir = Path("data/test")
+                input_dir = CONFIG.paths.default_input
                 input_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Effacer les fichiers existants (optionnel)

@@ -4,10 +4,12 @@ import logging
 import numpy as np
 from collections import defaultdict
 
+from modules.config import CONFIG
+
 logger = logging.getLogger(__name__)
 
-TARGET_CN_RATIO = 30  # Ratio C/N cible pour chaque silo
-SILO_SIZE_LIMIT = 100 * 1024 * 1024  # 1 GB, ajustez selon vos besoins
+TARGET_CN_RATIO = CONFIG.pipeline.target_cn_ratio
+SILO_SIZE_LIMIT = CONFIG.pipeline.silo_size_limit
 
 def create_silos(cn_results_path, target_cn_ratio=TARGET_CN_RATIO):
     with open(cn_results_path, 'r') as f:

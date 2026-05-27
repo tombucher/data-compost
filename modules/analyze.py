@@ -158,7 +158,8 @@ def analyze_image(file_path):
             raise ValueError(f"Failed to load image: {file_path}")
 
         # Create output directory
-        output_dir = os.path.join(os.path.dirname(file_path), "saliency_maps")
+        from modules.config import CONFIG
+        output_dir = os.path.join(os.path.dirname(file_path), CONFIG.paths.saliency_subdir)
         os.makedirs(output_dir, exist_ok=True)
 
         # Saliency map generation

@@ -5,10 +5,15 @@ import platform
 import threading
 import subprocess
 
+from modules.config import CONFIG
+
+
 class USBDetector:
     """Détecteur de clés USB compatible avec macOS et Raspberry Pi."""
-    
-    def __init__(self, callback=None, polling_interval=2.0):
+
+    def __init__(self, callback=None, polling_interval=None):
+        if polling_interval is None:
+            polling_interval = CONFIG.usb.polling_interval
         """
         Initialise le détecteur USB.
         

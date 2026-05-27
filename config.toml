@@ -1,0 +1,27 @@
+# Configuration centrale du pipeline data-compost.
+# Modifier ici plutôt que dans le code. Rechargé à chaque démarrage de main.py.
+
+[paths]
+# Répertoire source par défaut (overridable via --input)
+default_input = "data/test"
+# Racine des sorties générées par le pipeline
+output_root = "data/output"
+# Sous-dossiers spécifiques (relatifs à output_root)
+silos_subdir = "silos"
+composted_subdir = "composted"
+# Nom du sous-dossier d'artefacts de saliency créé à côté des fichiers source
+saliency_subdir = "saliency_maps"
+# Fichier de log centralisé
+log_file = "compost_process.log"
+
+[pipeline]
+# Ratio C/N cible pour chaque silo (référence agronomique: ~30)
+target_cn_ratio = 30
+# Taille max d'un silo en octets (100 Mo par défaut)
+silo_size_limit = 104857600
+# Seuil d'alerte (Mo) sur le volume total d'entrée
+input_size_warning_mb = 5000
+
+[usb]
+# Intervalle de polling pour la détection des clés USB (secondes)
+polling_interval = 2.0
