@@ -97,4 +97,4 @@ data-compost/
 
 ## Contribuer
 
-Les contributions sont les bienvenues ! Si vous avez des idées d’amélioration ou souhaitez signaler des problèmes, ouvrez une issue ou un pull request.
+Les contributions sont les bienvenues! Si vous avez des idées d’amélioration ou souhaitez signaler des problèmes, ouvrez une issue ou un pull request.
