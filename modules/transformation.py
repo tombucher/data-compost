@@ -324,6 +324,72 @@ def replace_words(text, intensity):
                 words[i] = synsets[0].lemmas()[0].name()
     return ' '.join(words)
 
+# Perte de matière visée par le compostage, en fraction de la taille d'origine.
+# Une matière inerte perd peu, une matière vive se décompose davantage.
+LOSS_MIN = 0.20
+LOSS_MAX = 0.60
+# Une image compostée ne descend pas sous cette taille : en dessous il ne reste
+# plus d'image, seulement du bruit.
+MIN_COMPOSTED_BYTES = 8 * 1024
+# Garde-fou sur la boucle de compression
+MAX_COMPRESSION_PASSES = 8
+
+
+def save_decomposed_image(img, destination, original_size, intensity):
+    """Écrit l'image compostée en garantissant qu'elle pèse moins que l'originale.
+
+    Décomposer doit faire perdre de la matière : c'est ce qui donne son sens au
+    binaire final. Or la pixellisation crée de larges aplats bordés de
+    transitions dures que le JPEG encode mal, et l'image ressortait souvent plus
+    lourde qu'à l'entrée — jusqu'à +83 % sur les échantillons du projet.
+
+    On resserre donc d'abord la qualité JPEG, puis les dimensions, jusqu'à
+    passer sous la cible. La perte visée croît avec l'intensité, elle-même
+    dérivée du ratio C/N : plus la matière est vive, plus elle se décompose.
+    """
+    destination = Path(destination)
+    # Pillow refuse d'écrire un JPEG depuis un mode à canal alpha ou palette
+    if img.mode not in ('RGB', 'L'):
+        img = img.convert('RGB')
+
+    loss = LOSS_MIN + (LOSS_MAX - LOSS_MIN) * max(0.0, min(1.0, intensity))
+    target_size = max(int(original_size * (1 - loss)), MIN_COMPOSTED_BYTES)
+
+    quality = 70
+    scale = 1.0
+    final_size = None
+
+    for _ in range(MAX_COMPRESSION_PASSES):
+        candidate = img
+        if scale < 1.0:
+            width = max(1, int(img.width * scale))
+            height = max(1, int(img.height * scale))
+            candidate = img.resize((width, height), Image.LANCZOS)
+
+        candidate.save(str(destination), 'JPEG', quality=quality, optimize=True)
+        final_size = destination.stat().st_size
+
+        if final_size <= target_size:
+            logger.debug(
+                f"{destination.name}: {original_size/1024:.1f}Ko → {final_size/1024:.1f}Ko "
+                f"(qualité {quality}, échelle {scale:.2f})"
+            )
+            return final_size
+
+        # Rogner la qualité tant qu'elle reste lisible, puis réduire la taille
+        if quality > 25:
+            quality -= 15
+        else:
+            scale *= 0.7
+
+    logger.warning(
+        f"{destination.name}: perte visée non atteinte après "
+        f"{MAX_COMPRESSION_PASSES} passes — {final_size/1024:.1f}Ko "
+        f"pour une cible de {target_size/1024:.1f}Ko"
+    )
+    return final_size
+
+
 def mix_files(composted_files, output_path):
     """Concatène byte-à-byte tous les fichiers compostés vers un unique fichier binaire de sortie (mixed_compost.bin)."""
     mixed_data = b''
@@ -398,53 +464,37 @@ def compost_file(file_info, output_dir):
     composted_path = output_dir / f"composted_{file_name}"
     
     cn_ratio = file_info['cn_data']['normalized_cn_ratio']
-    intensity = min(cn_ratio / 30, 1)
+    # Intensité de décomposition, rapportée à la cible agronomique
+    intensity = min(cn_ratio / CONFIG.pipeline.target_cn_ratio, 1)
 
     try:
-        if file_type in ['image', 'document']:
-            saliency_path = Path(file_info.get('additional_data', {}).get('saliency_map_gray', ''))
-
-            if saliency_path.exists():
-                saliency_map = cv2.imread(str(saliency_path), cv2.IMREAD_GRAYSCALE)
-            else:
-                logger.info(f"Création d'une carte de saillance pour {file_path}")
-                saliency_map = create_simple_saliency_map(str(file_path))
-
-            # Vérifier que la carte de saillance est valide
-            if saliency_map is None or saliency_map.size == 0:
-                saliency_map = np.ones((100, 100), dtype=np.uint8) * 128  # Carte par défaut
-
+        if file_type in ['image', 'document', 'text']:
             if file_type == 'image':
+                # La carte de saillance ne sert qu'à la pixellisation : la
+                # calculer pour un .txt revenait à passer un détecteur de
+                # contours sur du texte brut.
+                saliency_path = Path(file_info.get('additional_data', {}).get('saliency_map_gray', ''))
+
+                if saliency_path.exists():
+                    saliency_map = cv2.imread(str(saliency_path), cv2.IMREAD_GRAYSCALE)
+                else:
+                    logger.info(f"Création d'une carte de saillance pour {file_path}")
+                    saliency_map = create_simple_saliency_map(str(file_path))
+
+                # Vérifier que la carte de saillance est valide
+                if saliency_map is None or saliency_map.size == 0:
+                    saliency_map = np.ones((100, 100), dtype=np.uint8) * 128  # Carte par défaut
+
                 img = pixelate_image(str(file_path), saliency_map, intensity)
-
+                composted_path = composted_path.with_suffix('.jpg')
                 try:
-                    # Pour les JPG, PNG, etc., sauvegarder en JPEG avec qualité réduite
-                    if composted_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}:
-                        # Assurer que l'extension est .jpg pour compression
-                        composted_path = composted_path.with_suffix('.jpg')
-                        img.save(str(composted_path), 'JPEG', quality=70)
-                    else:
-                        # Pour les autres formats, sauvegarder tel quel
-                        img.save(str(composted_path))
-
-                    logger.info(f"Image compostée sauvegardée: {composted_path}")
-                    # Mesure intermédiaire : un redimensionnement supplémentaire
-                    # peut encore intervenir plus bas. Le bilan définitif est
-                    # journalisé en fin de compost_file().
-                    original_size = file_path.stat().st_size
-                    new_size = composted_path.stat().st_size
-                    reduction = (1 - new_size / original_size) * 100 if original_size > 0 else 0
-                    logger.debug(f"Après compression JPEG: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
+                    save_decomposed_image(
+                        img, composted_path, file_path.stat().st_size, intensity
+                    )
                 except Exception as e:
                     logger.error(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
-                    # Essayer une approche alternative en cas d'erreur
-                    try:
-                        img.convert('RGB').save(str(composted_path), 'JPEG', quality=70)
-                        logger.info(f"Sauvegarde de secours réussie: {composted_path}")
-                    except Exception as e2:
-                        logger.error(f"Échec de la sauvegarde alternative: {str(e2)}")
-            else:  # document
-                # Pour les documents, on les traite comme du texte
+            else:  # document et text
+                # Remplacement de mots par des synonymes WordNet
                 with open(file_path, 'r', errors='ignore') as f:
                     text = f.read()
                 new_text = replace_words(text, intensity)
@@ -496,23 +546,9 @@ def compost_file(file_info, output_dir):
         file_size = composted_path.stat().st_size
         original_size = file_info['common_metadata']['size']
         if file_size > 0:
-            # Si le fichier composté est plus grand que l'original, le redimensionner davantage
-            if file_type == 'image' and file_size > original_size * 0.8:
-                try:
-                    img = Image.open(str(composted_path))
-                    width, height = img.size
-                    # Redimensionner de 50% supplémentaires
-                    img = img.resize((width//2, height//2), Image.LANCZOS)
-                    img.save(str(composted_path), 'JPEG', quality=60)
-                    # Relire la taille : le journal annonçait sinon la taille
-                    # d'avant redimensionnement, jusqu'à 7 fois trop grande.
-                    file_size = composted_path.stat().st_size
-                    logger.info(
-                        f"Redimensionnement supplémentaire appliqué à {composted_path} "
-                        f"({file_size} octets)"
-                    )
-                except Exception as e:
-                    logger.error(f"Erreur lors du redimensionnement supplémentaire: {str(e)}")
+            # La taille est mesurée après toutes les passes de compression :
+            # le journal annonçait auparavant une valeur d'étape, jusqu'à sept
+            # fois supérieure au fichier réellement écrit.
             reduction = (1 - file_size / original_size) * 100 if original_size > 0 else 0
             logger.info(
                 f"Fichier composté créé avec succès: {composted_path} "
