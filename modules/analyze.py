@@ -433,17 +433,55 @@ def analyze_file(file_path):
         "additional_data": additional_data,
     }
 
+SUPPORTED_EXTENSIONS = {ext for exts in FILE_CATEGORIES.values() for ext in exts}
+
+
+def iter_source_files(directory):
+    """Liste les fichiers à composter dans `directory`, triés, sans doublon.
+
+    Règle unique de sélection pour tout le projet — validation en amont,
+    comptage et analyse doivent porter sur le même ensemble, sinon la barre
+    de progression et les résultats divergent.
+
+    Sont écartés :
+    - les artefacts `saliency_maps/` produits par une exécution précédente ;
+    - les fichiers cachés, sauf si pipeline.include_hidden_files est activé ;
+    - les extensions inconnues du pipeline.
+    """
+    directory = Path(directory)
+    saliency_subdir = CONFIG.paths.saliency_subdir
+    keep_hidden = CONFIG.pipeline.include_hidden_files
+
+    files = []
+    for path in directory.rglob('*'):
+        if not path.is_file():
+            continue
+        if saliency_subdir in path.parts:
+            continue
+        if path.name.startswith('.'):
+            if not keep_hidden:
+                continue
+            files.append(path)
+            continue
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            continue
+        files.append(path)
+
+    return sorted(files)
+
+
 def count_files(directory):
-    """Compte le nombre total de fichiers dans le répertoire et ses sous-répertoires."""
-    return sum(1 for _ in Path(directory).rglob('*') if _.is_file())
+    """Compte les fichiers que le pipeline va réellement analyser."""
+    return len(iter_source_files(directory))
 
 def analyze_directory(directory, visualization_queue=None):
     """Analyse récursivement tous les fichiers d'un répertoire en parallèle. Publie les résultats sur visualization_queue si fournie. Renvoie le chemin du JSON d'analyses."""
     results = []
     directory = Path(directory)
-    files_to_analyze = [p for p in directory.rglob('*') if p.is_file()]
+    files_to_analyze = iter_source_files(directory)
 
     total_files = len(files_to_analyze)
+    logger.info(f"{total_files} fichier(s) retenu(s) pour l'analyse dans {directory}")
 
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
         futures = [executor.submit(analyze_file, file_path) for file_path in files_to_analyze]

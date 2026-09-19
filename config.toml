@@ -4,6 +4,10 @@
 [paths]
 # Répertoire source par défaut (overridable via --input)
 default_input = "data/test"
+# Répertoire où sont copiés les fichiers d'une clé USB en mode --usb.
+# Distinct de default_input : la copie ne doit jamais écraser les fichiers
+# d'exemple du projet.
+usb_import = "data/usb_import"
 # Racine des sorties générées par le pipeline
 output_root = "data/output"
 # Sous-dossiers spécifiques (relatifs à output_root)
@@ -21,6 +25,14 @@ target_cn_ratio = 30
 silo_size_limit = 104857600
 # Seuil d'alerte (Mo) sur le volume total d'entrée
 input_size_warning_mb = 5000
+# Durée maximale de la phase de compostage, en secondes.
+# Au-delà, les fichiers restants ne sont pas compostés — le nombre d'ignorés
+# est journalisé. Mettre 0 pour composter la totalité, quel que soit le temps.
+compost_time_limit = 55
+# Traiter les fichiers cachés (.DS_Store, .gitignore...) comme matière brune.
+# false par défaut : ce sont des artefacts du système de fichiers, pas des
+# fichiers choisis par l'utilisateur, et leur ratio C/N extrême fausse les silos.
+include_hidden_files = false
 
 [usb]
 # Intervalle de polling pour la détection des clés USB (secondes)

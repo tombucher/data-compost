@@ -353,18 +353,38 @@ def compost_process(analysis_results_path):
     output_dir = analysis_results_path.parent / 'composted'
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Limite de durée : au-delà, les fichiers restants sont abandonnés. Réglable
+    # dans config.toml, 0 pour tout composter quelle que soit la durée.
+    time_limit = CONFIG.pipeline.compost_time_limit
+    total_files = len(file_data)
+    processed = 0
+
     for file_info in file_data:
         composted_file = compost_file(file_info, output_dir)
+        processed += 1
         if composted_file:
             composted_files.append(composted_file)
 
-        if time.time() - start_time > 55:
+        if time_limit and time.time() - start_time > time_limit:
+            remaining = total_files - processed
+            if remaining:
+                # Autrefois silencieux : le compost semblait complet alors qu'il
+                # ne contenait qu'une partie des fichiers.
+                logger.warning(
+                    f"Limite de {time_limit}s atteinte — {remaining} fichier(s) sur "
+                    f"{total_files} non compostés. Augmentez pipeline.compost_time_limit "
+                    f"dans config.toml (0 = sans limite) pour traiter la totalité."
+                )
             break
 
     output_path = output_dir / 'mixed_compost.bin'
     mix_files(composted_files, output_path)
 
-    logger.info(f"Composting process completed in {time.time() - start_time} seconds")
+    elapsed = time.time() - start_time
+    logger.info(
+        f"Compostage terminé en {elapsed:.1f}s — "
+        f"{len(composted_files)}/{total_files} fichier(s) compostés"
+    )
     return str(output_path)
 
 def compost_file(file_info, output_dir):
@@ -408,11 +428,13 @@ def compost_file(file_info, output_dir):
                         img.save(str(composted_path))
 
                     logger.info(f"Image compostée sauvegardée: {composted_path}")
-                    # Vérifier la taille avant/après
+                    # Mesure intermédiaire : un redimensionnement supplémentaire
+                    # peut encore intervenir plus bas. Le bilan définitif est
+                    # journalisé en fin de compost_file().
                     original_size = file_path.stat().st_size
                     new_size = composted_path.stat().st_size
                     reduction = (1 - new_size / original_size) * 100 if original_size > 0 else 0
-                    logger.info(f"Réduction de taille: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
+                    logger.debug(f"Après compression JPEG: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB ({reduction:.1f}%)")
                 except Exception as e:
                     logger.error(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
                     # Essayer une approche alternative en cas d'erreur
@@ -482,10 +504,20 @@ def compost_file(file_info, output_dir):
                     # Redimensionner de 50% supplémentaires
                     img = img.resize((width//2, height//2), Image.LANCZOS)
                     img.save(str(composted_path), 'JPEG', quality=60)
-                    logger.info(f"Redimensionnement supplémentaire appliqué à {composted_path}")
+                    # Relire la taille : le journal annonçait sinon la taille
+                    # d'avant redimensionnement, jusqu'à 7 fois trop grande.
+                    file_size = composted_path.stat().st_size
+                    logger.info(
+                        f"Redimensionnement supplémentaire appliqué à {composted_path} "
+                        f"({file_size} octets)"
+                    )
                 except Exception as e:
                     logger.error(f"Erreur lors du redimensionnement supplémentaire: {str(e)}")
-            logger.info(f"Fichier composté créé avec succès: {composted_path} ({file_size} octets)")
+            reduction = (1 - file_size / original_size) * 100 if original_size > 0 else 0
+            logger.info(
+                f"Fichier composté créé avec succès: {composted_path} "
+                f"({file_size} octets, {reduction:+.1f}% vs original)"
+            )
             return str(composted_path)
         else:
             logger.error(f"Erreur: Le fichier composté est vide: {composted_path}")

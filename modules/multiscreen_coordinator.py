@@ -9,6 +9,8 @@ import signal
 from enum import Enum
 from pathlib import Path
 
+from modules.config import CONFIG
+
 logger = logging.getLogger("CompostCoordinator")
 
 # Définition des phases du processus
@@ -26,28 +28,31 @@ class CompostVisualizer:
     Coordinateur central pour le système de visualisation multiécran
     du processus de compostage numérique.
     """
-    def __init__(self, input_directory, log_queue=None):
+    def __init__(self, input_directory, log_queue=None, skip_displays=False):
         self.input_directory = Path(input_directory)
-        self.output_directory = Path('data/output')
+        self.output_directory = CONFIG.paths.output_root
         self.log_queue = log_queue
+        # Sans affichage : ni fenêtres d'écrans, ni visualisation d'analyse,
+        # ni visualiseur binaire bloquant en fin de parcours.
+        self.skip_displays = skip_displays
         self.current_phase = CompostPhase.IDLE
         self.phase_progress = 0.0
         self.processes = {}
         self.queues = {}
-        
+
         # Créer les répertoires de sortie s'ils n'existent pas
         self.output_directory.mkdir(exist_ok=True, parents=True)
-        
+
         # Chemins des fichiers de données intermédiaires
         self.analysis_results_path = self.output_directory / 'analysis_results.json'
         self.cn_results_path = self.analysis_results_path  # Même fichier, mis à jour
-        self.silo_info_path = self.output_directory / 'silos' / 'silo_info.json'
-        self.compost_output_path = self.output_directory / 'composted' / 'mixed_compost.bin'
-        
+        self.silo_info_path = CONFIG.paths.silos_dir / 'silo_info.json'
+        self.compost_output_path = CONFIG.paths.composted_dir / 'mixed_compost.bin'
+
         # S'assurer que les chemins existent
-        (self.output_directory / 'silos').mkdir(exist_ok=True, parents=True)
-        (self.output_directory / 'composted').mkdir(exist_ok=True, parents=True)
-        
+        CONFIG.paths.silos_dir.mkdir(exist_ok=True, parents=True)
+        CONFIG.paths.composted_dir.mkdir(exist_ok=True, parents=True)
+
         # Initialiser les queues pour la communication inter-processus
         self.init_communication_queues()
 
@@ -138,7 +143,14 @@ class CompostVisualizer:
             from modules.analyze import count_files
             total_files = count_files(self.input_directory)
             logger.info(f"Nombre total de fichiers à analyser: {total_files}")
-            
+
+            if self.skip_displays:
+                from modules.analyze import analyze_directory
+                self.analysis_results_path = analyze_directory(self.input_directory)
+                logger.info(f"Analyse terminée. Résultats sauvegardés dans {self.analysis_results_path}")
+                self.update_displays(CompostPhase.FILE_ANALYSIS, 100.0)
+                return True
+
             # Créer une queue pour la visualisation
             visualization_queue = multiprocessing.Queue()
             update_queue = multiprocessing.Queue()
@@ -254,13 +266,20 @@ class CompostVisualizer:
         logger.info("Début de la phase de visualisation du résultat")
         self.update_displays(CompostPhase.RESULT_VISUALIZATION, 0.0)
         
+        if self.skip_displays:
+            logger.info(
+                "Mode sans affichage : visualiseur binaire non lancé. "
+                f"Résultat disponible dans {self.compost_output_path}"
+            )
+            self.update_displays(CompostPhase.RESULT_VISUALIZATION, 100.0)
+            return True
+
         try:
-            # Lancer le visualiseur de compost dans un processus séparé
-            visualizer_script = Path(__file__).parent / 'modules' / 'visualize_bin.py'
-            
-            if not visualizer_script.exists():
-                visualizer_script = Path('modules') / 'visualize_bin.py'
-            
+            # Ce fichier est déjà dans modules/ : y ajouter 'modules' viserait
+            # modules/modules/. L'ancien code ne fonctionnait que par le repli
+            # relatif, donc uniquement lancé depuis la racine du projet.
+            visualizer_script = Path(__file__).resolve().parent / 'visualize_bin.py'
+
             if not visualizer_script.exists():
                 raise FileNotFoundError(f"Le script visualiseur n'existe pas: {visualizer_script}")
             
@@ -288,9 +307,15 @@ class CompostVisualizer:
     def run_full_process(self):
         """Exécute le processus complet de compostage numérique"""
         logger.info("Démarrage du processus complet de compostage numérique")
-        
+
+        # Garde-fou : run_full_process suppose les écrans actifs
+        if self.skip_displays:
+            logger.warning(
+                "run_full_process() appelé avec skip_displays : les écrans sont ignorés."
+            )
+
         # Démarrer les processus d'affichage
-        if not self.start_display_processes():
+        if not self.skip_displays and not self.start_display_processes():
             logger.error("Impossible de démarrer les processus d'affichage. Arrêt.")
             return False
         

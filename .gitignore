@@ -33,3 +33,6 @@ nltk_data/
 
 # Pytest
 .pytest_cache/
+
+# Import depuis clé USB (contenu transitoire)
+data/usb_import/

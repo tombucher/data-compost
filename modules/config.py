@@ -18,6 +18,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Paths:
     default_input: Path
+    usb_import: Path
     output_root: Path
     silos_dir: Path
     composted_dir: Path
@@ -30,6 +31,8 @@ class Pipeline:
     target_cn_ratio: float
     silo_size_limit: int
     input_size_warning_mb: float
+    compost_time_limit: float
+    include_hidden_files: bool
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ class Config:
 _DEFAULTS = {
     "paths": {
         "default_input": "data/test",
+        "usb_import": "data/usb_import",
         "output_root": "data/output",
         "silos_subdir": "silos",
         "composted_subdir": "composted",
@@ -57,6 +61,8 @@ _DEFAULTS = {
         "target_cn_ratio": 30,
         "silo_size_limit": 100 * 1024 * 1024,
         "input_size_warning_mb": 5000,
+        "compost_time_limit": 55,
+        "include_hidden_files": False,
     },
     "usb": {
         "polling_interval": 2.0,
@@ -76,6 +82,7 @@ def _load(config_path: Path) -> Config:
     output_root = Path(p["output_root"])
     paths = Paths(
         default_input=Path(p["default_input"]),
+        usb_import=Path(p["usb_import"]),
         output_root=output_root,
         silos_dir=output_root / p["silos_subdir"],
         composted_dir=output_root / p["composted_subdir"],
@@ -87,6 +94,8 @@ def _load(config_path: Path) -> Config:
         target_cn_ratio=pl["target_cn_ratio"],
         silo_size_limit=pl["silo_size_limit"],
         input_size_warning_mb=pl["input_size_warning_mb"],
+        compost_time_limit=pl["compost_time_limit"],
+        include_hidden_files=pl["include_hidden_files"],
     )
     u = data["usb"]
     usb = Usb(polling_interval=u["polling_interval"])
