@@ -80,30 +80,42 @@ class BinarySonifier:
                 print(f"Erreur lors de la création du son: {e}")
 
 
+# Durée d'affichage d'une image, en millisecondes. pygame.time.get_ticks()
+# compte en millisecondes : la valeur était de 5, avec un commentaire annonçant
+# « 5 secondes ». Le segment sonore — cinq secondes de stéréo, 17 ms à
+# synthétiser — était donc régénéré à chaque image, saturant un cœur entier et
+# réduisant le son à un bégaiement de fondus de 100 ms.
+FRAME_DURATION_MS = 5000
+
+# Nombre d'octets parcourus à chaque image
+BYTES_PER_FRAME = 1000
+
+
 class BinaryVisualizer:
     def __init__(self, width: int, height: int):
         pygame.init()
-        
-        # Fenêtre principale pour la visualisation
+
         self.width = width
         self.height = height
-        self.screen = pygame.display.set_mode((width, height))
-        self.sonifier = BinarySonifier()
-        
-        # Fenêtre secondaire pour les données brutes
         self.data_width = 400
         self.data_height = height
+        self.sonifier = BinarySonifier()
+
+        # Une seule fenêtre : la visualisation à gauche, l'hexdump à droite.
+        # set_mode était appelé deux fois, le premier appel ne servant qu'à
+        # être immédiatement remplacé par le second.
         self.data_screen = pygame.display.set_mode(
             (width + self.data_width, height)
         )
+        self.screen = self.data_screen
         self.viz_surface = pygame.Surface((width, height))
         self.data_surface = pygame.Surface((self.data_width, height))
         
         # Configuration
         self.background_color = (0, 0, 0)
         self.text_color = (255, 255, 255)
-        self.lines_per_frame = 1000
-        self.frame_duration = 5  # 5 secondes en millisecondes
+        self.lines_per_frame = BYTES_PER_FRAME
+        self.frame_duration = FRAME_DURATION_MS
         self.patterns: List[Dict] = []
         
         # Configuration du texte

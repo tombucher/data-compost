@@ -1,40 +1,29 @@
 import pygame
-import sys
 from queue import Empty
 import math
-
-# Initialisation de Pygame
-pygame.init()
 
 # Constantes
 WINDOW_SIZE = (1024, 1024)
 BACKGROUND_COLOR = (0, 0, 0)  # Fond noir
 SQUARE_BORDER_COLOR = (255, 255, 255)  # Contour blanc
-SQUARE_FILL_COLOR = (0, 0, 0, 0)  # Fond transparent (ou noir)
 TEXT_COLOR = (255, 255, 255)  # Texte blanc
 MARGIN = 5
 MIN_SQUARE_SIZE = 5
+# Durée d'affichage du résultat final avant fermeture
+LINGER_MS = 1500
 MAX_SQUARE_SIZE = 500
 SCALE_FACTOR = 10 / 10000  # 10ko = 1px
-
-# Création de la fenêtre
-screen = pygame.display.set_mode(WINDOW_SIZE)
-pygame.display.set_caption("Visualisation de l'analyse des fichiers")
-
-# Police pour le texte
-font = pygame.font.Font(None, 24)
-small_font = pygame.font.Font(None, 20)
 
 def calculate_square_size(file_size):
     """Calcule la taille du carré basée sur le poids du fichier."""
     size = int(math.sqrt(file_size * SCALE_FACTOR))
     return max(min(size, MAX_SQUARE_SIZE), MIN_SQUARE_SIZE)
 
-def draw_square(x, y, size):
-    """Dessine un carré avec un contour blanc et un fond transparent."""
+def draw_square(screen, x, y, size):
+    """Dessine un carré au contour blanc, sans remplissage."""
     pygame.draw.rect(screen, SQUARE_BORDER_COLOR, (x, y, size, size), 1)
 
-def draw_progress_bar(progress):
+def draw_progress_bar(screen, progress):
     """Dessine la barre de progression."""
     bar_width = WINDOW_SIZE[0] - 40
     bar_height = 20
@@ -46,15 +35,19 @@ def draw_progress_bar(progress):
 def start_visualization(queue, update_queue, total_files, ready_queue=None, log_queue=None):
     from modules.logging_config import setup_worker_logging
     setup_worker_logging(log_queue)
+    pygame.init()
+    font = pygame.font.Font(None, 24)
+    small_font = pygame.font.Font(None, 20)
+
     files = {}
     current_file = None
     processed_files = 0
-    current_line = []
     max_y = MARGIN
     x, y = MARGIN, MARGIN
 
     clock = pygame.time.Clock()
     running = True
+    finished_at = None
 
     # Initialiser la fenêtre et signaler que nous sommes prêts
     screen = pygame.display.set_mode(WINDOW_SIZE)
@@ -76,6 +69,11 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
             while True:
                 file_info = queue.get_nowait()
                 if file_info is None:
+                    # Fin de l'analyse : laisser le dernier état visible un
+                    # instant, puis rendre la main. Sans cela le processus
+                    # tournait indéfiniment et le coordinateur le terminait de
+                    # force à chaque exécution.
+                    finished_at = pygame.time.get_ticks()
                     break
                 file_name, file_size, category = file_info
                 size = calculate_square_size(file_size)
@@ -85,7 +83,6 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
                     x = MARGIN
                     y = max_y + MARGIN
                     max_y = y + size
-                    current_line = []
                 else:
                     max_y = max(max_y, y + size)
                 
@@ -93,7 +90,6 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
                     # Réinitialiser si on atteint le bas de l'écran
                     x, y = MARGIN, MARGIN
                     max_y = MARGIN
-                    current_line = []
                 
                 files[file_name] = {
                     'name': file_name,
@@ -105,7 +101,6 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
                     'visual_size': size
                 }
                 
-                current_line.append(files[file_name])
                 x += size + MARGIN
                 current_file = files[file_name]
                 processed_files += 1
@@ -126,7 +121,7 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
 
         # Dessiner tous les carrés
         for file in files.values():
-            draw_square(file['x'], file['y'], file['visual_size'])
+            draw_square(screen, file['x'], file['y'], file['visual_size'])
 
         # Afficher les informations au survol
         mouse_pos = pygame.mouse.get_pos()
@@ -150,10 +145,13 @@ def start_visualization(queue, update_queue, total_files, ready_queue=None, log_
 
         # Dessiner la barre de progression
         progress = processed_files / total_files if total_files > 0 else 0
-        draw_progress_bar(progress)
+        draw_progress_bar(screen, progress)
 
         pygame.display.flip()
         clock.tick(30)  # 30 FPS
+
+        if finished_at is not None and pygame.time.get_ticks() - finished_at >= LINGER_MS:
+            running = False
 
     pygame.quit()
 

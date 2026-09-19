@@ -6,22 +6,13 @@ import logging
 import multiprocessing
 import subprocess
 import signal
-from enum import Enum
 from pathlib import Path
 
 from modules.config import CONFIG
+from modules.phases import CompostPhase
 
 logger = logging.getLogger("CompostCoordinator")
 
-# Définition des phases du processus
-class CompostPhase(Enum):
-    """Les 5 phases ordonnées du pipeline de compostage, du démarrage à la visualisation finale."""
-    IDLE = 0
-    FILE_ANALYSIS = 1
-    CN_CALCULATION = 2
-    SILO_CREATION = 3
-    COMPOSTING = 4
-    RESULT_VISUALIZATION = 5
 
 class CompostVisualizer:
     """

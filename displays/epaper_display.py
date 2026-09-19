@@ -1,22 +1,16 @@
 import pygame
 import json
-import os
 import sys
+from pathlib import Path
 import logging
 import traceback
 import multiprocessing
-from enum import Enum
+
+from modules.phases import CompostPhase, coerce_phase
+from modules.calculate_cn import cn_position
 
 logger = logging.getLogger("EPaperDisplay")
 
-# Définition des phases du processus
-class CompostPhase(Enum):
-    IDLE = 0
-    FILE_ANALYSIS = 1
-    CN_CALCULATION = 2
-    SILO_CREATION = 3
-    COMPOSTING = 4
-    RESULT_VISUALIZATION = 5
 
 # Constantes
 # Dimensions standard pour un écran ePaper 2.9" (296x128 pixels)
@@ -61,7 +55,7 @@ class EPaperVisualizer:
             }
             
         except Exception as e:
-            logging.error(f"Erreur d'initialisation: {str(e)}")
+            logger.error(f"Erreur d'initialisation: {str(e)}")
             traceback.print_exc()
             pygame.quit()
             raise
@@ -78,13 +72,26 @@ class EPaperVisualizer:
                 self._calculate_statistics()
             elif self.current_phase == CompostPhase.SILO_CREATION:
                 self.silo_data = data
+                # Recalculer la pagination : les silos arrivent en cours de
+                # route, le nombre de pages était figé au démarrage et les
+                # derniers silos restaient inatteignables.
+                self._recompute_pages()
     
+    def _recompute_pages(self):
+        """Pages = résumé + matières + une page par tranche de 3 silos."""
+        if self.silo_data:
+            self.max_pages = 2 + (len(self.silo_data) + 2) // 3
+        else:
+            self.max_pages = 3
+        if self.current_page >= self.max_pages:
+            self.current_page = self.max_pages - 1
+
     def load_data(self, cn_results_path, silo_info_path=None):
         """Charge les données des fichiers JSON."""
         try:
-            logging.info(f"Chargement des données depuis {cn_results_path}")
-            if not os.path.exists(cn_results_path):
-                logging.error(f"Le fichier {cn_results_path} n'existe pas")
+            logger.info(f"Chargement des données depuis {cn_results_path}")
+            if not Path(cn_results_path).exists():
+                logger.error(f"Le fichier {cn_results_path} n'existe pas")
                 return False
                 
             with open(cn_results_path, 'r') as f:
@@ -93,14 +100,14 @@ class EPaperVisualizer:
             # Calculer les statistiques
             self._calculate_statistics()
                 
-            if silo_info_path and os.path.exists(silo_info_path):
-                logging.info(f"Chargement des données de silos depuis {silo_info_path}")
+            if silo_info_path and Path(silo_info_path).exists():
+                logger.info(f"Chargement des données de silos depuis {silo_info_path}")
                 with open(silo_info_path, 'r') as f:
                     self.silo_data = json.load(f)
             
             return True
         except Exception as e:
-            logging.error(f"Erreur lors du chargement des données: {str(e)}")
+            logger.error(f"Erreur lors du chargement des données: {str(e)}")
             traceback.print_exc()
             return False
     
@@ -146,7 +153,7 @@ class EPaperVisualizer:
         self.summary_data['categories'] = categories
         
         # Log pour débogage
-        logging.info(f"Statistiques calculées: {self.summary_data}")
+        logger.info(f"Statistiques calculées: {self.summary_data}")
     
     def _draw_text(self, text, font, color, x, y):
         """Dessine un texte à une position spécifique."""
@@ -155,7 +162,7 @@ class EPaperVisualizer:
             self.screen.blit(text_surface, (x, y))
             return text_surface.get_rect().height + y
         except Exception as e:
-            logging.error(f"Erreur lors du dessin de texte: {str(e)}")
+            logger.error(f"Erreur lors du dessin de texte: {str(e)}")
             return y + 10
     
     def _draw_text_centered(self, text, font, color, y, x=None):
@@ -171,7 +178,7 @@ class EPaperVisualizer:
             self.screen.blit(text_surface, text_rect)
             return text_rect.bottom
         except Exception as e:
-            logging.error(f"Erreur lors du dessin de texte: {str(e)}")
+            logger.error(f"Erreur lors du dessin de texte: {str(e)}")
             return y + 10
     
     def _draw_progress_bar(self, x, y, width, height, progress, min_val=0, max_val=100, current_val=None):
@@ -194,7 +201,7 @@ class EPaperVisualizer:
             
             return y + height
         except Exception as e:
-            logging.error(f"Erreur lors du dessin de la barre de progression: {str(e)}")
+            logger.error(f"Erreur lors du dessin de la barre de progression: {str(e)}")
             return y + height
     
     def _draw_summary_page(self):
@@ -229,7 +236,10 @@ class EPaperVisualizer:
             
             # Ratio C/N avec barre simple
             y = self._draw_text(f"C/N RATIO: {avg_cn_ratio:.1f}", self.text_font, TEXT_COLOR, 10, y) + 5
-            self._draw_progress_bar(10, y, WINDOW_SIZE[0] - 20, 10, avg_cn_ratio, 0, 100)
+            # Position sur l'échelle C/N plutôt que le ratio brut : au-delà de 100
+            # la barre était pleine quelle que soit la valeur.
+            self._draw_progress_bar(10, y, WINDOW_SIZE[0] - 20, 10,
+                                    cn_position(avg_cn_ratio) * 100, 0, 100)
             
             # Calculer le nombre total de pages
             total_silo_pages = (len(self.silo_data or []) + 2) // 3  # 3 silos max par page
@@ -241,7 +251,7 @@ class EPaperVisualizer:
             self._draw_text_centered(page_text, self.small_font, TEXT_COLOR, y)
             
         except Exception as e:
-            logging.error(f"Erreur page résumé: {str(e)}")
+            logger.error(f"Erreur page résumé: {str(e)}")
             traceback.print_exc()
 
     def _draw_materials_page(self):
@@ -344,7 +354,7 @@ class EPaperVisualizer:
             self._draw_text_centered(page_text, self.small_font, TEXT_COLOR, y)
             
         except Exception as e:
-            logging.error(f"Erreur page matières: {str(e)}")
+            logger.error(f"Erreur page matières: {str(e)}")
             traceback.print_exc()
 
     def _draw_silos_page(self):
@@ -381,7 +391,8 @@ class EPaperVisualizer:
                     y = self._draw_text(silo_line, self.text_font, TEXT_COLOR, 10, y) + 3
                     
                     # Barre de progression pour le ratio C/N
-                    self._draw_progress_bar(10, y, WINDOW_SIZE[0] - 20, 8, avg_cn, 0, 100)
+                    self._draw_progress_bar(10, y, WINDOW_SIZE[0] - 20, 8,
+                                            cn_position(avg_cn) * 100, 0, 100)
                     y += 12
             else:
                 # Message si aucune donnée
@@ -393,7 +404,7 @@ class EPaperVisualizer:
             self._draw_text_centered(page_text, self.small_font, TEXT_COLOR, y)
             
         except Exception as e:
-            logging.error(f"Erreur page silos: {str(e)}")
+            logger.error(f"Erreur page silos: {str(e)}")
             traceback.print_exc()
     
     def draw(self):
@@ -411,12 +422,7 @@ class EPaperVisualizer:
         clock = pygame.time.Clock()
         
         try:
-            # Calculer le nombre total de pages
-            if self.silo_data:
-                total_silo_pages = (len(self.silo_data) + 2) // 3  # 3 silos max par page
-                self.max_pages = 2 + total_silo_pages  # Page résumé + page matières + pages silos
-            else:
-                self.max_pages = 3  # Page résumé + page matières + 1 page silos vide
+            self._recompute_pages()
             
             while running:
                 # Vérifier les événements Pygame
@@ -445,7 +451,7 @@ class EPaperVisualizer:
                         data = update_data.get('data')
                         self.update(phase, progress, data)
                     except Exception as e:
-                        logging.error(f"Erreur lors de la mise à jour : {str(e)}")
+                        logger.error(f"Erreur lors de la mise à jour : {str(e)}")
                 
                 # Dessiner la page actuelle
                 self.draw()
@@ -454,7 +460,7 @@ class EPaperVisualizer:
                 pygame.display.flip()
                 clock.tick(5)  # Rafraîchissement lent pour l'ePaper
         except Exception as e:
-            logging.error(f"Erreur d'affichage: {str(e)}")
+            logger.error(f"Erreur d'affichage: {str(e)}")
             traceback.print_exc()
         finally:
             pygame.quit()
@@ -473,7 +479,7 @@ def start_epaper_display(update_queue, stop_queue, cn_results_path=None, silo_in
     from modules.logging_config import setup_worker_logging
     setup_worker_logging(log_queue)
     try:
-        logging.info("Starting ePaper display process")
+        logger.info("Starting ePaper display process")
         
         # Initialiser l'affichage
         display = EPaperVisualizer()
@@ -485,28 +491,28 @@ def start_epaper_display(update_queue, stop_queue, cn_results_path=None, silo_in
         # Lancer l'affichage
         display.display(update_queue, stop_queue)
         
-        logging.info("ePaper display process stopped")
+        logger.info("ePaper display process stopped")
         
     except Exception as e:
-        logging.error(f"Error in ePaper display process: {str(e)}")
+        logger.error(f"Error in ePaper display process: {str(e)}")
         pygame.quit()
 
 def display_compost_info(cn_results_path, silo_info_path=None):
     """Fonction principale pour afficher les informations sur le compost (compatible avec le code existant)."""
     try:
-        logging.info("Initialisation de l'affichage ePaper")
+        logger.info("Initialisation de l'affichage ePaper")
         display = EPaperVisualizer()
         
-        logging.info(f"Chargement des données depuis {cn_results_path}")
+        logger.info(f"Chargement des données depuis {cn_results_path}")
         success = display.load_data(cn_results_path, silo_info_path)
         
         if success:
-            logging.info("Affichage de l'interface utilisateur")
+            logger.info("Affichage de l'interface utilisateur")
             display.display()
         else:
-            logging.error("Impossible de charger les données")
+            logger.error("Impossible de charger les données")
     except Exception as e:
-        logging.error(f"Erreur: {str(e)}")
+        logger.error(f"Erreur: {str(e)}")
         traceback.print_exc()
         pygame.quit()
 

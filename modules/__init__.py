@@ -11,7 +11,7 @@ __all__ = [
     'calculate_cn',
     'create_silos',
     'transformation',
-    'compost_info_display',
     'file_analysis_visualization',
-    'usb_detector'
+    'usb_detector',
+    'phases',
 ]

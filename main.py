@@ -42,7 +42,6 @@ def check_system_requirements():
         'calculate_cn.py',
         'create_silos.py',
         'transformation.py',
-        'compost_info_display.py',
         'visualize_bin.py',
     ]
 

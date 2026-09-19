@@ -5,16 +5,8 @@ Ce package contient les modules pour afficher les informations sur les différen
 écrans utilisés dans le système.
 """
 
-from enum import Enum
-
-# Définition des phases du processus, utilisée par tous les modules d'affichage
-class CompostPhase(Enum):
-    IDLE = 0
-    FILE_ANALYSIS = 1
-    CN_CALCULATION = 2
-    SILO_CREATION = 3
-    COMPOSTING = 4
-    RESULT_VISUALIZATION = 5
+# Réexport pour compatibilité : la définition vit dans modules.phases
+from modules.phases import CompostPhase
 
 # Importation pour faciliter l'accès
 try:

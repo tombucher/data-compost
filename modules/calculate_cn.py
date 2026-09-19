@@ -53,6 +53,30 @@ AGE_SWING = 0.5
 CN_CEILING = 500
 
 
+def cn_position(ratio, target=TARGET_CN_RATIO, ceiling=CN_CEILING):
+    """Place un ratio C/N sur une échelle d'affichage [0, 1], centrée sur la cible.
+
+    0.5 correspond exactement au ratio cible : en dessous la matière est verte,
+    au-dessus elle est brune. Les deux moitiés sont logarithmiques, sinon toute
+    la matière verte — qui vit entre 1 et 30 — s'entasserait dans le premier
+    dixième de la barre tandis que les archives satureraient l'autre bout.
+
+    Les écrans normalisaient auparavant par `ratio / 100`, hérité du temps où
+    le ratio était un index borné à 100 : depuis que l'échelle monte à 500,
+    toute matière brune s'affichait de la même couleur.
+    """
+    try:
+        ratio = float(ratio)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(ratio) or ratio <= 1:
+        return 0.0 if ratio <= 1 else 1.0
+
+    if ratio <= target:
+        return _clamp(0.5 * math.log(ratio) / math.log(target))
+    return _clamp(0.5 + 0.5 * math.log(ratio / target) / math.log(ceiling / target))
+
+
 def _clamp(value, low=0.0, high=1.0):
     """Ramène `value` dans [low, high], en absorbant None et les types inattendus."""
     try:

@@ -6,32 +6,17 @@ import random
 import json
 import logging
 import multiprocessing
-from enum import Enum
 import numpy as np
 from collections import defaultdict
 import os
 from pathlib import Path
 
+from modules.phases import CompostPhase, PHASE_COLORS, coerce_phase
+from modules.calculate_cn import CN_CEILING, cn_position
+
 logger = logging.getLogger("HDMIDisplay")
 
-# Définition des phases du processus
-class CompostPhase(Enum):
-    IDLE = 0
-    FILE_ANALYSIS = 1
-    CN_CALCULATION = 2
-    SILO_CREATION = 3
-    COMPOSTING = 4
-    RESULT_VISUALIZATION = 5
 
-# Couleurs pour chaque phase
-PHASE_COLORS = {
-    CompostPhase.IDLE: (80, 80, 80),               # Gris
-    CompostPhase.FILE_ANALYSIS: (46, 204, 113),    # Vert
-    CompostPhase.CN_CALCULATION: (52, 152, 219),   # Bleu
-    CompostPhase.SILO_CREATION: (155, 89, 182),    # Violet
-    CompostPhase.COMPOSTING: (241, 196, 15),       # Jaune
-    CompostPhase.RESULT_VISUALIZATION: (231, 76, 60)  # Rouge
-}
 
 class HDMIDisplay:
     """
@@ -99,12 +84,14 @@ class HDMIDisplay:
     def _process_data(self):
         """Traite les données reçues selon la phase actuelle"""
         if self.current_phase == CompostPhase.FILE_ANALYSIS and isinstance(self.data, list):
-            # Stocker les données d'analyse de fichiers
+            # Comparer des dictionnaires par « in » sur une liste est quadratique
+            # et coûteux ; le nom de fichier suffit à identifier la matière.
             for file_info in self.data:
-                if file_info not in self.history['analysis']:
+                name = file_info.get('common_metadata', {}).get('name', '')
+                if name and name not in self.file_nodes:
                     self.history['analysis'].append(file_info)
                     self._create_file_node(file_info)
-        
+
         elif self.current_phase == CompostPhase.CN_CALCULATION and isinstance(self.data, list):
             # Stocker les ratios C/N
             for file_info in self.data:
@@ -112,10 +99,14 @@ class HDMIDisplay:
                 cn_data = file_info.get('cn_data', {})
                 if file_name and cn_data:
                     self.history['cn_ratios'][file_name] = cn_data
-                    # Mettre à jour le nœud de fichier existant
-                    if file_name in self.file_nodes:
-                        self.file_nodes[file_name]['cn_ratio'] = cn_data.get('normalized_cn_ratio', 0)
-                        self.file_nodes[file_name]['file_type'] = cn_data.get('file_type', 'unknown')
+                    # Créer le nœud s'il n'existe pas encore. Le coordinateur
+                    # n'envoie aucune donnée pendant la phase d'analyse : la
+                    # branche ci-dessus ne se déclenchait donc jamais, aucun
+                    # nœud n'était créé, et l'écran restait vide de bout en bout.
+                    if file_name not in self.file_nodes:
+                        self._create_file_node(file_info)
+                    self.file_nodes[file_name]['cn_ratio'] = cn_data.get('normalized_cn_ratio', 0)
+                    self.file_nodes[file_name]['file_type'] = cn_data.get('file_type', 'unknown')
         
         elif self.current_phase == CompostPhase.SILO_CREATION and isinstance(self.data, list):
             # Stocker les configurations de silos
@@ -205,9 +196,13 @@ class HDMIDisplay:
                     node['target_y'] = y + random.randint(-height//2, height//2)
     
     def _cn_ratio_to_color(self, cn_ratio):
-        """Convertit un ratio C/N en couleur (brun à vert)"""
-        # Normaliser entre 0 et 1
-        normalized = min(1.0, max(0.0, cn_ratio / 100.0))
+        """Convertit un ratio C/N en couleur, du vert azoté au brun carboné.
+
+        La position vient de cn_position(), centrée sur la cible et
+        logarithmique de part et d'autre. Une division par 100 rendait
+        identiques toutes les matières au-delà de ce seuil.
+        """
+        normalized = cn_position(cn_ratio)
         
         # Vert pour faible C/N (plus d'azote)
         # Brun pour C/N élevé (plus de carbone)
@@ -374,8 +369,10 @@ class HDMIDisplay:
         gradient_width = legend_width - 20
         gradient_height = 20
         for i in range(gradient_width):
-            normalized = i / gradient_width
-            color = self._cn_ratio_to_color(normalized * 100)
+            # Interpoler sur l'échelle réelle : du vert le plus azoté au brun
+            # le plus carboné, en passant par la cible au milieu
+            ratio = CN_CEILING ** (i / gradient_width)
+            color = self._cn_ratio_to_color(ratio)
             pygame.draw.line(self.screen, color, 
                            (legend_x + 10 + i, legend_y + 40), 
                            (legend_x + 10 + i, legend_y + 40 + gradient_height))
