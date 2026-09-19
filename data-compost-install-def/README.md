@@ -8,6 +8,12 @@ l'installation data-compost sur du matériel réel, sans simulation d'écrans.
 - Imprimante thermique Epson TM-T70II, USB en ESC/POS direct
 - Écran HDMI standard
 
+L'application pilote ces périphériques directement : chaque sortie teste
+son matériel au démarrage et retombe sur une simulation à l'écran s'il est
+absent. Le même code tourne donc sur le poste de développement et sur le Pi.
+Pensez à passer `fullscreen = true` dans la section `[hardware]` de
+`config.toml` une fois sur le Raspberry Pi.
+
 ## Table des matières
 
 - [Prérequis](#prérequis)

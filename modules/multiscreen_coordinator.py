@@ -87,6 +87,13 @@ class CompostVisualizer:
                 args=(self.queues['epaper'], self.stop_queue, str(self.cn_results_path), str(self.silo_info_path), self.log_queue)
             )
             
+            # Imprimante thermique (processus Python)
+            from displays.thermal_printer import start_printer_display
+            self.processes['printer'] = multiprocessing.Process(
+                target=start_printer_display,
+                args=(self.queues['printer'], self.stop_queue, self.log_queue)
+            )
+
             # Démarrer les processus
             for name, process in self.processes.items():
                 logger.info(f"Démarrage du processus d'affichage: {name}")
@@ -241,9 +248,12 @@ class CompostVisualizer:
             # Lancer le processus de compostage
             from modules.transformation import compost_process
             self.compost_output_path = compost_process(self.analysis_results_path)
-            
-            # Mettre à jour les écrans 
-            self.update_displays(CompostPhase.COMPOSTING, 100.0)
+
+            # Mettre à jour les écrans avec le bilan matière, dont le ticket
+            # imprimé a besoin en fin de cycle.
+            self.update_displays(
+                CompostPhase.COMPOSTING, 100.0, self._composting_summary()
+            )
             
             logger.info(f"Processus de compostage terminé. Résultat sauvegardé dans {self.compost_output_path}")
             return True
@@ -251,6 +261,23 @@ class CompostVisualizer:
         except Exception as e:
             logger.error(f"Erreur lors du processus de compostage: {str(e)}")
             return False
+
+    def _composting_summary(self):
+        """Compte ce qui est sorti du compostage, pour les écrans et le ticket."""
+        composted_dir = CONFIG.paths.composted_dir
+        final_name = Path(self.compost_output_path).name
+        try:
+            produced = [
+                p for p in composted_dir.iterdir()
+                if p.is_file() and p.name != final_name
+            ]
+        except OSError:
+            produced = []
+
+        return {
+            'composted_files': len(produced),
+            'output_bytes': sum(p.stat().st_size for p in produced),
+        }
 
     def execute_visualization_phase(self):
         """Exécute la phase de visualisation du résultat"""

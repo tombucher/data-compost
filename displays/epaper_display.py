@@ -8,6 +8,7 @@ import multiprocessing
 
 from modules.phases import CompostPhase, coerce_phase
 from modules.calculate_cn import cn_position
+from displays.epaper_backend import EPaperOutput
 
 logger = logging.getLogger("EPaperDisplay")
 
@@ -29,8 +30,13 @@ class EPaperVisualizer:
         try:
             # Initialiser Pygame
             pygame.init()
-            self.screen = pygame.display.set_mode(WINDOW_SIZE)
-            pygame.display.set_caption("Data Compost - E-paper Display")
+            pygame.font.init()
+
+            # La sortie choisit elle-même entre la dalle Waveshare et une
+            # fenêtre de simulation ; le dessin reste identique dans les deux
+            # cas et se fait sur une surface hors écran.
+            self.output = EPaperOutput()
+            self.screen = pygame.Surface(WINDOW_SIZE)
             
             # Polices adaptées à l'écran ePaper
             self.title_font = pygame.font.SysFont('Courier', 16, bold=True)
@@ -62,7 +68,7 @@ class EPaperVisualizer:
     
     def update(self, phase, progress, data=None):
         """Met à jour l'état de l'affichage"""
-        self.current_phase = phase if isinstance(phase, CompostPhase) else CompostPhase(phase)
+        self.current_phase = coerce_phase(phase)
         self.progress = progress
         
         # Mettre à jour les données si fournies
@@ -91,7 +97,9 @@ class EPaperVisualizer:
         try:
             logger.info(f"Chargement des données depuis {cn_results_path}")
             if not Path(cn_results_path).exists():
-                logger.error(f"Le fichier {cn_results_path} n'existe pas")
+                # Normal au démarrage : l'analyse n'a pas encore produit le
+                # fichier. L'écran se remplira via les mises à jour de phase.
+                logger.info(f"Pas encore de données d'analyse dans {cn_results_path}")
                 return False
                 
             with open(cn_results_path, 'r') as f:
@@ -425,8 +433,9 @@ class EPaperVisualizer:
             self._recompute_pages()
             
             while running:
-                # Vérifier les événements Pygame
-                for event in pygame.event.get():
+                # Sans fenêtre — cas de la dalle réelle — il n'y a pas de
+                # file d'événements à interroger.
+                for event in (pygame.event.get() if pygame.display.get_surface() else ()):
                     if event.type == pygame.QUIT:
                         running = False
                     elif event.type == pygame.KEYDOWN:
@@ -453,16 +462,23 @@ class EPaperVisualizer:
                     except Exception as e:
                         logger.error(f"Erreur lors de la mise à jour : {str(e)}")
                 
-                # Dessiner la page actuelle
+                # Dessiner la page actuelle sur la surface hors écran
                 self.draw()
-                
-                # Actualiser l'affichage
-                pygame.display.flip()
-                clock.tick(5)  # Rafraîchissement lent pour l'ePaper
+
+                # L'envoi ne se fait que si l'image a changé, et pas plus
+                # souvent que l'intervalle configuré : une dalle e-paper met
+                # deux secondes par rafraîchissement et s'use à être réécrite.
+                self.output.show(self.screen)
+
+                clock.tick(5)
         except Exception as e:
             logger.error(f"Erreur d'affichage: {str(e)}")
             traceback.print_exc()
         finally:
+            try:
+                self.output.close()
+            except Exception as exc:  # noqa: BLE001 — l'arrêt ne doit pas lever
+                logger.warning(f"Fermeture de la sortie e-paper : {exc}")
             pygame.quit()
 
 def start_epaper_display(update_queue, stop_queue, cn_results_path=None, silo_info_path=None, log_queue=None):

@@ -4,6 +4,7 @@ import time
 import logging
 import multiprocessing
 
+from modules.config import CONFIG
 from modules.phases import (
     CompostPhase, PHASE_COLORS, PHASE_DESCRIPTIONS, coerce_phase,
 )
@@ -17,8 +18,16 @@ class CircularProgressDisplay:
     Classe pour gérer l'affichage sur l'écran circulaire.
     Montre la phase actuelle et la progression sous forme d'anneau.
     """
-    def __init__(self, screen_size=(320, 320)):
-        """Initialise l'affichage circulaire"""
+    def __init__(self, screen_size=None):
+        """Initialise l'affichage circulaire.
+
+        La dalle Waveshare 4" (C) est un carré de 720x720 dont seul le disque
+        inscrit est visible : tout ce qui déborde du cercle est perdu. La
+        valeur par défaut de 320x320 datait d'un écran de développement.
+        """
+        if screen_size is None:
+            side = CONFIG.hardware.circular_size
+            screen_size = (side, side)
         self.width, self.height = screen_size
         self.center = (self.width // 2, self.height // 2)
         self.radius = min(self.width, self.height) // 2 - 20
@@ -27,22 +36,25 @@ class CircularProgressDisplay:
         pygame.init()
         pygame.font.init()
         
-        # Créer la fenêtre
-        self.screen = pygame.display.set_mode(screen_size)
+        # Sur le Raspberry Pi la dalle n'a ni bureau ni bordure de fenêtre
+        flags = pygame.NOFRAME if CONFIG.hardware.fullscreen else 0
+        self.screen = pygame.display.set_mode(screen_size, flags)
         pygame.display.set_caption("Compost Process - Circular Display")
-        
-        # Polices pour le texte
-        self.phase_font = pygame.font.SysFont('Arial', 28, bold=True)
-        self.progress_font = pygame.font.SysFont('Arial', 40, bold=True)
-        self.description_font = pygame.font.SysFont('Arial', 14)
+
+        # Polices proportionnelles à la dalle, pour rester lisibles de 320 à 720
+        scale = min(self.width, self.height) / 320
+        self.phase_font = pygame.font.SysFont('Arial', int(28 * scale), bold=True)
+        self.progress_font = pygame.font.SysFont('Arial', int(40 * scale), bold=True)
+        self.description_font = pygame.font.SysFont('Arial', int(14 * scale))
         
         # État initial
         self.current_phase = CompostPhase.IDLE
         self.progress = 0.0
         self.last_update_time = time.time()
         
-        # Épaisseur de l'anneau
-        self.ring_thickness = 20
+        # Épaisseur de l'anneau, proportionnelle au diamètre
+        self.ring_thickness = max(8, int(20 * scale))
+        self.scale = scale
         
         # Animation
         self.animation_offset = 0
@@ -53,9 +65,7 @@ class CircularProgressDisplay:
     def update(self, phase, progress):
         """Met à jour l'état actuel de l'affichage"""
         try:
-            # Convertir en CompostPhase si c'est un entier
-            if isinstance(phase, int):
-                phase = CompostPhase(phase)
+            phase = coerce_phase(phase)
             self.current_phase = phase
             self.progress = progress
             self.last_update_time = time.time()
@@ -132,7 +142,7 @@ class CircularProgressDisplay:
         phase_text = self.phase_font.render(phase_name, True, (255, 255, 255))
         
         # Positionner le texte au centre
-        text_rect = phase_text.get_rect(center=(self.center[0], self.center[1] - 20))
+        text_rect = phase_text.get_rect(center=(self.center[0], self.center[1] - int(20 * self.scale)))
         
         # Dessiner le texte
         self.screen.blit(phase_text, text_rect)
@@ -143,7 +153,7 @@ class CircularProgressDisplay:
         progress_text = self.progress_font.render(f"{int(self.progress)}%", True, (255, 255, 255))
         
         # Positionner le texte au centre
-        text_rect = progress_text.get_rect(center=(self.center[0], self.center[1] + 30))
+        text_rect = progress_text.get_rect(center=(self.center[0], self.center[1] + int(30 * self.scale)))
         
         # Dessiner le texte
         self.screen.blit(progress_text, text_rect)

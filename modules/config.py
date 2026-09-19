@@ -36,6 +36,18 @@ class Pipeline:
 
 
 @dataclass(frozen=True)
+class Hardware:
+    force_simulation: bool
+    epaper_min_refresh_seconds: float
+    epaper_lib_path: Path
+    circular_size: int
+    fullscreen: bool
+    printer_enabled: bool
+    printer_vendor_id: int
+    printer_columns: int
+
+
+@dataclass(frozen=True)
 class Usb:
     polling_interval: float
 
@@ -45,6 +57,7 @@ class Config:
     paths: Paths
     pipeline: Pipeline
     usb: Usb
+    hardware: Hardware
 
 
 _DEFAULTS = {
@@ -66,6 +79,16 @@ _DEFAULTS = {
     },
     "usb": {
         "polling_interval": 2.0,
+    },
+    "hardware": {
+        "force_simulation": False,
+        "epaper_min_refresh_seconds": 20,
+        "epaper_lib_path": "~/e-Paper/RaspberryPi_JetsonNano/python/lib",
+        "circular_size": 720,
+        "fullscreen": False,
+        "printer_enabled": True,
+        "printer_vendor_id": 0x04B8,
+        "printer_columns": 42,
     },
 }
 
@@ -99,7 +122,19 @@ def _load(config_path: Path) -> Config:
     )
     u = data["usb"]
     usb = Usb(polling_interval=u["polling_interval"])
-    return Config(paths=paths, pipeline=pipeline, usb=usb)
+    h = data["hardware"]
+    hardware = Hardware(
+        force_simulation=bool(h["force_simulation"]),
+        epaper_min_refresh_seconds=float(h["epaper_min_refresh_seconds"]),
+        # expanduser : le chemin par défaut vise le dossier de l'utilisateur du Pi
+        epaper_lib_path=Path(h["epaper_lib_path"]).expanduser(),
+        circular_size=int(h["circular_size"]),
+        fullscreen=bool(h["fullscreen"]),
+        printer_enabled=bool(h["printer_enabled"]),
+        printer_vendor_id=int(h["printer_vendor_id"]),
+        printer_columns=int(h["printer_columns"]),
+    )
+    return Config(paths=paths, pipeline=pipeline, usb=usb, hardware=hardware)
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent

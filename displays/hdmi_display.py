@@ -11,6 +11,7 @@ from collections import defaultdict
 import os
 from pathlib import Path
 
+from modules.config import CONFIG
 from modules.phases import CompostPhase, PHASE_COLORS, coerce_phase
 from modules.calculate_cn import CN_CEILING, cn_position
 
@@ -31,8 +32,9 @@ class HDMIDisplay:
         pygame.init()
         pygame.freetype.init()
         
-        # Créer la fenêtre
-        self.screen = pygame.display.set_mode(screen_size)
+        # Plein écran sur l'installation, fenêtre en développement
+        flags = pygame.FULLSCREEN if CONFIG.hardware.fullscreen else 0
+        self.screen = pygame.display.set_mode(screen_size, flags)
         pygame.display.set_caption("Compost Process - Main Display")
         
         # Polices pour le texte
@@ -65,9 +67,7 @@ class HDMIDisplay:
     def update(self, phase, progress, data=None):
         """Met à jour l'état actuel de l'affichage"""
         try:
-            # Convertir en CompostPhase si c'est un entier
-            if isinstance(phase, int):
-                phase = CompostPhase(phase)
+            phase = coerce_phase(phase)
             self.current_phase = phase
             self.progress = progress
             self.last_update_time = time.time()

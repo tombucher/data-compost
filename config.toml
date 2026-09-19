@@ -37,3 +37,29 @@ include_hidden_files = false
 [usb]
 # Intervalle de polling pour la détection des clés USB (secondes)
 polling_interval = 2.0
+
+[hardware]
+# Forcer la simulation à l'écran même si le matériel est branché.
+# Laisser false : la détection est automatique, la simulation prend le relais
+# dès qu'un périphérique est absent.
+force_simulation = false
+
+# Écran e-paper Waveshare 2.9" — 296x128, piloté en SPI.
+# Une dalle e-paper met environ deux secondes par rafraîchissement complet et
+# s'use si on l'actualise en continu : on n'écrit que lorsque le contenu a
+# changé, et jamais plus souvent que cet intervalle.
+epaper_min_refresh_seconds = 20
+# Chemin de la bibliothèque Waveshare clonée par install-script.sh
+epaper_lib_path = "~/e-Paper/RaspberryPi_JetsonNano/python/lib"
+
+# Écran circulaire Waveshare 4" (C) en DSI : dalle carrée de 720x720 dont seul
+# le disque inscrit est visible.
+circular_size = 720
+# Plein écran sans bordure, à activer sur le Raspberry Pi
+fullscreen = false
+
+# Imprimante thermique Epson en ESC/POS direct (identifiant constructeur Epson)
+printer_enabled = true
+printer_vendor_id = 0x04b8
+# Largeur du ticket en caractères, pour un rouleau de 80 mm
+printer_columns = 42

@@ -335,40 +335,88 @@ Vérifier le compositeur en cours : `echo $XDG_CURRENT_DESKTOP`, ou
 
 ## 6. Intégration dans data-compost
 
-État actuel : les trois modules de `displays/` ouvrent des fenêtres pygame qui
-imitent les écrans — 320×320 pour le circulaire, 296×128 en noir et blanc pour
-l'e-paper, 1280×720 pour le HDMI. Utile pour développer sur un poste de
-travail, à remplacer sur le Pi.
+Le projet pilote le matériel directement. Il n'y a rien à configurer pour
+passer de la simulation au réel : chaque sortie teste son périphérique au
+démarrage et bascule seule.
 
-Le passage au matériel réel se répartit ainsi :
-
-| Écran | Aujourd'hui | Sur le Pi |
+| Écran | Sortie réelle | Repli |
 |---|---|---|
-| Circulaire | fenêtre pygame 320×320 | même code pygame en 720×720 plein écran sur `DSI-1` — aucune réécriture, seulement la taille et le placement |
-| HDMI | fenêtre pygame 1280×720 | idem, plein écran sur `HDMI-A-1` |
-| E-paper | fenêtre pygame noir et blanc | à réécrire : Pillow + `waveshare_epd`, pygame n'intervient plus |
-| Imprimante | file `'printer'` que personne ne lit | processus à écrire, consommant la file et imprimant en ESC/POS |
+| Circulaire | pygame en 720×720 sur `DSI-1` | fenêtre de même taille |
+| HDMI | pygame plein écran sur `HDMI-A-1` | fenêtre 1280×720 |
+| E-paper | Pillow + `waveshare_epd` en SPI | fenêtre 296×128 |
+| Imprimante | ESC/POS direct via pyusb | ticket écrit dans le journal |
 
-Le coordinateur `modules/multiscreen_coordinator.py` alimente déjà une file par
-périphérique, imprimante comprise. Les messages ont cette forme :
+Au démarrage, le journal indique ce qui a été trouvé :
 
-```python
-{
-    'phase': 3,
-    'phase_name': 'SILO_CREATION',
-    'progress': 100.0,
-    'timestamp': 1758312345.67,
-    'data': {...},          # résultats de la phase, ou None
-}
+```
+EPaperDisplay  Écran e-paper : dalle Waveshare détectée
+ThermalPrinter Imprimante detectee : 0x04b8:0e15
 ```
 
-Un pilote e-paper réel se branche donc au même endroit que le simulateur, avec
-la même signature `start_epaper_display(update_queue, stop_queue, cn_results_path, silo_info_path, log_queue)`.
-Deux contraintes à respecter côté e-paper : ne pas redessiner à chaque message
-(la dalle met deux secondes et s'use), et appeler `sleep()` entre les
-affichages.
+ou, sans matériel :
 
----
+```
+EPaperDisplay  Écran e-paper : dalle indisponible (...), passage en simulation
+ThermalPrinter Imprimante : indisponible (...), passage en mode a blanc
+```
+
+### Réglages
+
+La section `[hardware]` de `config.toml`, à la racine du projet :
+
+```toml
+[hardware]
+force_simulation = false            # true pour ignorer le matériel branché
+epaper_min_refresh_seconds = 20     # intervalle minimal entre deux écritures
+epaper_lib_path = "~/e-Paper/RaspberryPi_JetsonNano/python/lib"
+circular_size = 720                 # côté de la dalle DSI
+fullscreen = false                  # passer à true sur le Pi
+printer_enabled = true
+printer_vendor_id = 0x04b8
+printer_columns = 42                # largeur du ticket, rouleau 80 mm
+```
+
+**Sur le Raspberry Pi, mettez `fullscreen = true`** : l'écran circulaire perd
+sa bordure de fenêtre et l'HDMI passe en plein écran.
+
+### Ménagement de la dalle e-paper
+
+Une dalle e-paper met environ deux secondes par rafraîchissement complet et
+s'abîme si on l'actualise en continu. La version précédente redessinait à
+cinq images par seconde, ce qui est impossible sur du matériel réel.
+
+Deux garde-fous s'appliquent maintenant, et uniquement au matériel réel — la
+simulation suit le rythme du rendu :
+
+1. l'image n'est envoyée que si elle a changé, comparée par empreinte ;
+2. jamais plus souvent que `epaper_min_refresh_seconds`.
+
+La dalle est remise en veille après chaque écriture, et effacée à l'arrêt.
+
+### Le ticket
+
+Un seul ticket par cycle, à la fin du compostage :
+
+```
+DATA-COMPOST
+------------------------------------------
+2026-09-19 23:45:08
+
+Fichiers entres                         11
+Fichiers compostes                      11
+Silos                                    1
+C/N moyen                             84.2
+
+Matiere entree                     7410 Ko
+Matiere restante                   3682 Ko
+Perte                               50.3 %
+
+------------------------------------------
+Compostage termine
+```
+
+Le texte reste sans accent : les pages de code ESC/POS varient d'un modèle à
+l'autre et un accent mal interprété sort en caractère parasite.
 
 ## 7. Commandes de diagnostic
 
