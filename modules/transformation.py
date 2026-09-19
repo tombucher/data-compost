@@ -390,6 +390,96 @@ def save_decomposed_image(img, destination, original_size, intensity):
     return final_size
 
 
+# Taille des fragments érodés, en fraction du fichier. Trop gros, la
+# décomposition tronque par blocs ; trop fin, elle coûte cher sans rien changer
+# de visible dans le binaire final.
+EROSION_CHUNKS = 256
+MIN_CHUNK_BYTES = 64
+# Plancher absolu : un fichier composté garde toujours un reste, décomposer
+# n'est pas supprimer. Volontairement bas — un plancher élevé exempterait les
+# petits fichiers de toute décomposition.
+MIN_DECOMPOSED_BYTES = 16
+
+
+def decompose_bytes(source_path, destination, intensity):
+    """Érode le flux d'octets d'un fichier, quel que soit son format.
+
+    Traitement de dernier recours pour la matière opaque — archives,
+    exécutables, fichiers système, sons, formats propriétaires — dont on ne
+    sait rien interpréter. La matière est rongée par fragments, et ce qui
+    subsiste subit une altération bit à bit proportionnelle à l'intensité.
+
+    Ces catégories étaient auparavant soit copiées à l'identique, soit
+    abandonnées avec un avertissement « type non supporté » : la matière brune
+    traversait l'analyse et les silos, puis disparaissait avant le binaire.
+    """
+    source_path = Path(source_path)
+    destination = Path(destination)
+    data = source_path.read_bytes()
+    original_size = len(data)
+
+    if original_size <= 1:
+        destination.write_bytes(data)
+        return original_size
+
+    loss = LOSS_MIN + (LOSS_MAX - LOSS_MIN) * max(0.0, min(1.0, intensity))
+    # Le plancher ne peut pas dépasser la matière disponible, sinon un petit
+    # fichier ressortirait intact.
+    floor = min(MIN_DECOMPOSED_BYTES, original_size - 1)
+    target_size = max(int(original_size * (1 - loss)), floor)
+
+    # Le fragment s'adapte à la taille : au moins huit fragments, pour qu'un
+    # petit fichier s'érode lui aussi par morceaux plutôt que d'un bloc.
+    chunk = max(1, min(original_size // 8,
+                       max(MIN_CHUNK_BYTES, original_size // EROSION_CHUNKS)))
+    kept = bytearray()
+    for offset in range(0, original_size, chunk):
+        # Chaque fragment a une chance d'être consommé, proportionnelle à la
+        # perte visée : l'érosion est irrégulière, comme une vraie dégradation.
+        if random.random() < loss:
+            continue
+        kept.extend(data[offset:offset + chunk])
+
+    # L'érosion est probabiliste : rogner ou rendre la fin pour viser la cible
+    if len(kept) > target_size:
+        del kept[target_size:]
+    elif len(kept) < target_size:
+        missing = target_size - len(kept)
+        kept.extend(data[original_size - missing:])
+
+    # Altération bit à bit de ce qui reste : la matière conservée se dégrade
+    # aussi, elle ne se contente pas de manquer.
+    rot_count = int(len(kept) * 0.02 * intensity)
+    for _ in range(rot_count):
+        position = random.randrange(len(kept))
+        kept[position] ^= 1 << random.randrange(8)
+
+    destination.write_bytes(bytes(kept))
+    logger.debug(
+        f"{destination.name}: érosion {original_size/1024:.1f}Ko → "
+        f"{len(kept)/1024:.1f}Ko ({rot_count} octets altérés)"
+    )
+    return len(kept)
+
+
+def decompose_text(text, intensity):
+    """Décompose un texte : synonymes puis disparition progressive des mots.
+
+    Le seul remplacement par synonymes pouvait allonger le texte, alors que
+    décomposer doit faire perdre de la matière.
+    """
+    text = replace_words(text, intensity)
+    words = text.split()
+    if not words:
+        return text
+
+    loss = LOSS_MIN + (LOSS_MAX - LOSS_MIN) * max(0.0, min(1.0, intensity))
+    survivors = [w for w in words if random.random() >= loss]
+    if not survivors:
+        survivors = words[:1]  # il reste toujours quelque chose
+    return ' '.join(survivors)
+
+
 def mix_files(composted_files, output_path):
     """Concatène byte-à-byte tous les fichiers compostés vers un unique fichier binaire de sortie (mixed_compost.bin)."""
     mixed_data = b''
@@ -454,7 +544,17 @@ def compost_process(analysis_results_path):
     return str(output_path)
 
 def compost_file(file_info, output_dir):
-    """Applique la transformation adaptée au type (pixelation image / extraction frame vidéo / remplacement mots / copie). Renvoie le chemin du fichier composté ou None."""
+    """Décompose un fichier selon son type et renvoie le chemin du résultat.
+
+    Image : pixellisation modulée par la saillance, puis compression jusqu'à
+    perte effective. Texte et document : synonymes puis disparition de mots.
+    Vidéo : extraction de la dernière image, compostée comme une image. Tout le
+    reste — archives, exécutables, sons, formats propriétaires, extensions
+    inconnues — passe par l'érosion binaire.
+
+    Aucune catégorie n'est écartée : toute matière entrée dans les silos finit
+    dans le compost, et toute matière compostée pèse moins qu'à l'entrée.
+    """
     output_dir = Path(output_dir)
     file_path = Path(file_info['common_metadata']['path'])
     file_name = file_path.name
@@ -494,18 +594,18 @@ def compost_file(file_info, output_dir):
                 except Exception as e:
                     logger.error(f"Erreur lors de la sauvegarde de l'image compostée: {str(e)}")
             else:  # document et text
-                # Remplacement de mots par des synonymes WordNet
                 with open(file_path, 'r', errors='ignore') as f:
                     text = f.read()
-                new_text = replace_words(text, intensity)
+                new_text = decompose_text(text, intensity)
                 with open(composted_path, 'w') as f:
                     f.write(new_text)
 
         elif file_type == 'video':
+            frame_path = composted_path.with_suffix(composted_path.suffix + '.jpg')
             try:
                 cap = cv2.VideoCapture(str(file_path))
                 if not cap.isOpened():
-                    raise Exception("Unable to open video file")
+                    raise RuntimeError("lecture vidéo impossible")
 
                 # Lire la dernière image de la vidéo
                 last_frame = None
@@ -514,29 +614,31 @@ def compost_file(file_info, output_dir):
                     if not ret:
                         break
                     last_frame = frame.copy()
-
-                if last_frame is not None:
-                    # Sauvegarder l'image extraite avec extension .jpg
-                    composted_path = composted_path.with_suffix(composted_path.suffix + '.jpg')
-                    cv2.imwrite(str(composted_path), last_frame)
-                    logger.info(f"Image extraite de la vidéo et sauvegardée: {composted_path}")
-                else:
-                    raise Exception("Impossible d'extraire des images de la vidéo")
-
                 cap.release()
-                return str(composted_path)
-            except Exception as e:
-                logger.error(f"Error processing video {file_path}: {str(e)}")
-                return None
 
-        elif file_type in ['audio', 'creative', 'hidden']:
-            # Pour ces types, on copie simplement le fichier
-            import shutil
-            shutil.copy2(str(file_path), str(composted_path))
+                if last_frame is None:
+                    raise RuntimeError("aucune image extractible")
+
+                # Passer par la même compression que les images, pour que la
+                # perte soit garantie ici aussi.
+                composted_path = frame_path
+                rgb = cv2.cvtColor(last_frame, cv2.COLOR_BGR2RGB)
+                save_decomposed_image(
+                    Image.fromarray(rgb), composted_path,
+                    file_path.stat().st_size, intensity,
+                )
+                logger.info(f"Image extraite de la vidéo et compostée: {composted_path}")
+            except Exception as e:
+                # Une vidéo illisible reste de la matière : on l'érode en octets
+                logger.warning(f"Vidéo {file_path.name} non décodable ({e}), érosion binaire")
+                decompose_bytes(file_path, composted_path, intensity)
 
         else:
-            logger.warning(f"Warning: Unsupported file type: {file_type}")
-            return None
+            # Matière opaque — archives, exécutables, fichiers système, sons,
+            # formats propriétaires, extensions inconnues. Rien à interpréter,
+            # donc on décompose directement le flux d'octets. Toute catégorie
+            # aboutit ici : plus aucun fichier n'est écarté du compost.
+            decompose_bytes(file_path, composted_path, intensity)
 
     except Exception as e:
         logger.error(f"Error composting file {file_path}: {str(e)}")
