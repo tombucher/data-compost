@@ -11,7 +11,6 @@ from PIL import Image
 import cv2
 import numpy as np
 from moviepy import VideoFileClip
-import librosa
 import PyPDF2
 from docx import Document
 import nltk
