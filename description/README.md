@@ -1,3 +1,9 @@
+> **Documents d'intention, antérieurs au code.** Ce dossier décrit une
+> arborescence — `src/modules/`, `front/`, `data/train` — qui n'a pas été
+> réalisée sous cette forme. Le pipeline qui tourne est décrit dans le
+> `README.md` à la racine. Ces pages sont conservées pour ce qu'elles disent
+> des intentions de départ, pas comme documentation de référence.
+
 # Description technique du projet Data-Compost
 
 Ce fichier contient des informations détaillées sur l'architecture, les objectifs techniques, et les spécifications des différents modules du projet **Data-Compost**.
