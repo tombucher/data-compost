@@ -36,3 +36,6 @@ nltk_data/
 
 # Import depuis clé USB (contenu transitoire)
 data/usb_import/
+
+# Outillage local : chemins absolus propres à la machine
+.claude/
