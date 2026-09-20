@@ -1,4 +1,45 @@
-numpy
-opencv-python
-pandas
-matplotlib
+# Paquets de base essentiels
+numpy>=1.24.0
+tqdm>=4.66.0
+pygame>=2.5.0
+
+# Traitement d'image
+opencv-python>=4.8.0
+pillow>=10.0.0
+
+# Traitement de fichiers
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+
+# Traitement de texte et de langue
+nltk>=3.8.0
+langdetect>=1.0.9
+
+# Visualisation
+matplotlib>=3.8.0
+
+# Audio — facultatif : analyze_audio() sait s'en passer.
+# Non installé sur Raspberry Pi (numba/llvmlite trop lourds sur ARM).
+librosa>=0.10.0
+
+# Analyse et extraction de caractéristiques
+colorgram.py>=1.2.0
+scipy>=1.11.0
+# OCR : nécessite aussi le binaire tesseract (brew install tesseract /
+# sudo apt install tesseract-ocr)
+pytesseract>=0.3.10
+
+# Réseaux de neurones (facultatifs pour le Pi)
+torch
+torchvision
+transformers>=4.36.0
+
+# Traitement vidéo — 2.0 minimum : analyze.py utilise l'API
+# « from moviepy import VideoFileClip », absente des versions 1.x
+moviepy>=2.0.0
+
+# Utilitaires
+urllib3>=2.0.0
+
+# Tests (dev)
+pytest>=8.0.0

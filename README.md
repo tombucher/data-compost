@@ -1,100 +1,124 @@
-# data-compost
+# Système de Compostage Numérique
 
-## Description
+Ce projet simule le processus de compostage organique mais avec des fichiers numériques. Il analyse les fichiers comme des matières organiques, calcule leur ratio carbone/azote, les organise en silos équilibrés, puis les "décompose" en créant un nouveau fichier binaire qui est une fusion transformée des originaux.
 
-**data-compost** est un projet qui vise à traiter et transformer des fichiers numériques à travers un processus appelé "compostage numérique". Il utilise des techniques de segmentation, d'analyse, de transformation, et de visualisation pour donner un nouvel aspect aux données tout en générant des métadonnées pour le suivi.
+## Concept
 
-## Fonctionnalités principales
+Le compostage numérique transforme les fichiers à travers plusieurs phases :
+1. **Analyse** : Extraction des métadonnées et caractéristiques des fichiers 
+2. **Classification C/N** : Détermination si un fichier est plutôt "vert" (riche en azote) ou "brun" (riche en carbone)
+3. **Organisation** : Répartition dans des silos pour équilibrer le ratio C/N global
+4. **Transformation** : "Décomposition" des fichiers pour créer un compost numérique final
 
-- **Analyse des fichiers** : Extraction de métadonnées, classification des fichiers, détection de la qualité, calcul du rapport carbone/azote.
-- **Segmentation** : Clustering basé sur le contenu, création de silos virtuels, et distribution des fichiers dans ces silos.
-- **Transformation** : Altération et fusion des fichiers, génération de compost numérique avec des métadonnées de transformation.
-- **Interprétation** : Génération de narratifs, extraction de caractéristiques, analyse sentimentale.
-- **Visualisation** : Interface utilisateur permettant de suivre et visualiser le compostage numérique.
+## Architecture du système
 
-## Architecture du projet
+Le système utilise trois écrans différents et potentiellement une imprimante thermique :
+- **Écran circulaire** : Affiche la phase actuelle et la progression
+- **Écran HDMI principal** : Montre des visualisations détaillées du processus
+- **Écran e-paper** : Présente les statistiques et informations clés
+- **Imprimante thermique** : Peut imprimer une représentation du résultat final
 
-```bash
-data-compost/
-├── data/
-│   ├── train/
-│   └── test/
-├── src/
-│   ├── modules/
-│   │   ├── analysis.py
-│   │   ├── segmentation.py
-│   │   ├── transformation.py
-│   ├── utils/
-│   └── main.py
-├── front/
-│   ├── index.html
-│   ├── styles.css
-│   └── scripts.js
-├── description/
-│   └── README.md
-├── ressources/
-│   └── images/
-├── notebooks/
-│   └── data_exploration.ipynb
-├── requirements.txt
-└── README.md
-
-```
 ## Installation
 
-1. Clonez ce dépôt :
+### Environnement virtuel
 
-    ```bash
-    git clone https://github.com/tombucher/data-compost.git
-    cd data-compost
-    ```
+Le projet utilise un environnement virtuel Python isolé (`venv/`) avec
+toutes ses dépendances. **Il faut l'activer avant chaque session** :
 
-2. Créez un environnement virtuel et activez-le :
+```bash
+# Première fois uniquement : créer le venv et installer les dépendances
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # Pour macOS/Linux
-    venv\Scripts\activate  # Pour Windows
-    ```
+# Ensuite, à chaque nouvelle session terminal :
+source venv/bin/activate
+```
 
-3. Installez les dépendances Python :
+Une fois le venv activé, `python` pointe vers l'interpréteur du venv et
+toutes les dépendances sont disponibles. Pour quitter le venv :
+`deactivate`.
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+> Astuce : si `python: command not found` apparaît, c'est que le venv
+> n'est pas activé. Sur macOS, le système ne fournit que `python3` —
+> jamais `python`.
 
-4. Pour le front-end (si applicable), installez les dépendances Node.js :
+### Configuration matérielle 
 
-    ```bash
-    npm install
-    ```
+1. Connectez l'écran circulaire (via HDMI ou SPI)
+2. Connectez l'écran HDMI principal 
+3. Connectez l'écran e-paper (via SPI généralement)
+4. Connectez l'imprimante thermique (si applicable)
 
 ## Utilisation
 
-1. **Analyse des fichiers** : Utilisez le module d’analyse pour extraire des métadonnées et classer les fichiers.
+### Préparation
 
-    ```bash
-    python src/modules/analysis.py
-    ```
+Placez les fichiers à "composter" dans le dossier `data/test/` ou spécifiez un autre dossier lors de l'exécution.
 
-2. **Segmentation** : Segmentez les fichiers selon leur contenu.
+### Exécution
 
-    ```bash
-    python src/modules/segmentation.py
-    ```
+⚠️ Activer d'abord le venv : `source venv/bin/activate`
 
-3. **Transformation des fichiers** : Transformez les fichiers en compost numérique.
+Pour lancer le programme complet :
+```bash
+python main.py --input data/test
+```
 
-    ```bash
-    python src/modules/transformation.py
-    ```
+Pour exécuter uniquement le processus sans interfaces graphiques :
+```bash
+python main.py --input data/test --skip-displays
+```
 
-4. **Lancement du front-end** : Démarrez l’interface utilisateur.
+Pour démarrer à une phase spécifique :
+```bash
+python main.py --input data/test --phase 3  # Commence à la création des silos
+```
 
-    ```bash
-    npm start
-    ```
+### Tests
 
-## Contribuer
+```bash
+pytest tests/
+```
 
-Les contributions sont les bienvenues! Si vous avez des idées d’amélioration ou souhaitez signaler des problèmes, ouvrez une issue ou un pull request.
+### Configuration
+
+Les chemins, seuils C/N et paramètres du pipeline sont centralisés dans
+[`config.toml`](config.toml) à la racine du projet. Modifier ce fichier
+plutôt que le code.
+
+## Structure du projet
+
+```
+data-compost/
+├── data/                      # Données d'entrée et résultats
+├── modules/                   # Modules de traitement
+├── displays/                  # Modules d'affichage 
+└── main.py                    # Script principal
+```
+
+## Phases détaillées
+
+1. **Analyse des fichiers**
+   - Analyse de tous les fichiers et leurs métadonnées
+   - Classification initiale par type
+
+2. **Calcul des ratios C/N**
+   - Détermination des propriétés carbone/azote
+   - Normalisation des ratios
+
+3. **Création des silos**
+   - Organisation des fichiers en groupes équilibrés
+   - Optimisation du ratio C/N global
+
+4. **Processus de compostage**
+   - Transformation adaptée selon le type de fichier
+   - Fusion progressive des données
+
+5. **Visualisation finale**
+   - Présentation du "compost numérique" résultant
+   - Analyse visuelle et sonore du résultat
+
+## Contribution
+
+Ce projet est une œuvre artistique et technique explorant la matérialité des données numériques.

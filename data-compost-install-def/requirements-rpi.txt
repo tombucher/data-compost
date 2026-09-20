@@ -1,0 +1,39 @@
+# Dépendances Python de data-compost pour Raspberry Pi 5.
+#
+# À installer dans un venv créé avec --system-site-packages : numpy, opencv,
+# pygame, scipy, matplotlib et Pillow viennent des paquets apt (compilés et
+# optimisés pour ARM), les compiler avec pip prendrait des heures.
+#
+# Paquets apt correspondants, installés par install-script.sh :
+#   python3-numpy python3-opencv python3-pygame python3-scipy
+#   python3-matplotlib python3-pil python3-gpiozero python3-lgpio python3-spidev
+#
+# Différences avec le requirements.txt du poste de développement :
+#   - torch / torchvision / transformers retirés (~2 Go, le captioning vidéo
+#     BLIP se désactive tout seul quand ils sont absents)
+#   - librosa retiré du socle : il tire numba et llvmlite, longs et fragiles à
+#     construire sur ARM. analyze_audio() a déjà une reprise sans librosa.
+#     Pour l'installer quand même : pip install librosa
+#   - python-magic retiré : déclaré mais jamais importé par le projet
+
+tqdm>=4.66.0
+
+# Lecture de fichiers
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+
+# Texte et langue
+nltk>=3.8.0
+langdetect>=1.0.9
+
+# Analyse d'image
+colorgram.py>=1.2.0
+pytesseract>=0.3.10
+
+# Vidéo — s'appuie sur le ffmpeg système installé par apt.
+# 2.0 minimum : analyze.py fait « from moviepy import VideoFileClip »,
+# l'API 1.x exigeait « from moviepy.editor import VideoFileClip ».
+moviepy>=2.0.0
+
+# Utilitaires
+urllib3>=2.0.0

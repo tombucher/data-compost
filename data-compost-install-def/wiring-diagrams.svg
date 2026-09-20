@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000">
+  <!-- Styles -->
+  <style>
+    .rpi-board { fill: #4CAF50; stroke: #333; stroke-width: 1; }
+    .rpi-usb { fill: #3F51B5; stroke: #333; stroke-width: 1; }
+    .rpi-hdmi { fill: #673AB7; stroke: #333; stroke-width: 1; }
+    .rpi-dsi { fill: #E91E63; stroke: #333; stroke-width: 1; }
+    .rpi-gpio { fill: #FF9800; stroke: #333; stroke-width: 1; }
+    .rpi-csi { fill: #607D8B; stroke: #333; stroke-width: 1; }
+    .rpi-ethernet { fill: #795548; stroke: #333; stroke-width: 1; }
+    .rpi-audio { fill: #9E9E9E; stroke: #333; stroke-width: 1; }
+    .rpi-power { fill: #F44336; stroke: #333; stroke-width: 1; }
+    .circle-display { fill: #FFEB3B; stroke: #333; stroke-width: 2; }
+    .epaper-display { fill: #BDBDBD; stroke: #333; stroke-width: 2; }
+    .thermal-printer { fill: #26A69A; stroke: #333; stroke-width: 2; }
+    .hdmi-display { fill: #78909C; stroke: #333; stroke-width: 2; }
+    .wire { stroke-width: 2; fill: none; }
+    .wire-power { stroke: #F44336; }
+    .wire-data { stroke: #3F51B5; }
+    .wire-gnd { stroke: #424242; }
+    .wire-spi { stroke: #FF9800; }
+    .wire-signal { stroke: #8BC34A; }
+    .wire-hdmi { stroke: #673AB7; }
+    .wire-dsi { stroke: #E91E63; }
+    .wire-usb { stroke: #00BCD4; }
+    .gpio-pin { fill: #FFB74D; stroke: #333; stroke-width: 0.5; }
+    .gpio-label { font-family: Arial; font-size: 8px; }
+    .pin-label { font-family: Arial; font-size: 8px; text-anchor: middle; }
+    .device-label { font-family: Arial; font-size: 14px; font-weight: bold; text-anchor: middle; }
+    .section-title { font-family: Arial; font-size: 18px; font-weight: bold; text-anchor: middle; }
+    .pin-number { font-family: Arial; font-size: 6px; text-anchor: middle; fill: #000; }
+  </style>
+
+  <!-- Title and Legend -->
+  <text x="400" y="30" class="section-title">Schémas de Câblage pour Raspberry Pi 5 Multi-écrans</text>
+  
+  <!-- Legend -->
+  <rect x="620" y="50" width="15" height="10" class="wire wire-power" />
+  <text x="640" y="58" class="gpio-label">Alimentation</text>
+  <rect x="620" y="65" width="15" height="10" class="wire wire-gnd" />
+  <text x="640" y="73" class="gpio-label">Masse (GND)</text>
+  <rect x="620" y="80" width="15" height="10" class="wire wire-data" />
+  <text x="640" y="88" class="gpio-label">Données</text>
+  <rect x="620" y="95" width="15" height="10" class="wire wire-spi" />
+  <text x="640" y="103" class="gpio-label">SPI</text>
+  <rect x="620" y="110" width="15" height="10" class="wire wire-dsi" />
+  <text x="640" y="118" class="gpio-label">DSI</text>
+  <rect x="620" y="125" width="15" height="10" class="wire wire-usb" />
+  <text x="640" y="133" class="gpio-label">USB</text>
+  <rect x="620" y="140" width="15" height="10" class="wire wire-hdmi" />
+  <text x="640" y="148" class="gpio-label">HDMI</text>
+
+  <!-- DSI Circular Display Wiring Section -->
+  <text x="400" y="180" class="section-title">1. Écran circulaire Waveshare 4 pouces (DSI)</text>
+  
+  <!-- Raspberry Pi Board for DSI -->
+  <rect x="100" y="200" width="180" height="120" rx="10" class="rpi-board" />
+  <text x="190" y="230" class="device-label">Raspberry Pi 5</text>
+  
+  <!-- DSI Port -->
+  <rect x="160" y="320" width="60" height="15" class="rpi-dsi" />
+  <text x="190" y="330" class="pin-label">DSI</text>
+  
+  <!-- Circular Display -->
+  <circle cx="400" cy="280" r="80" class="circle-display" />
+  <text x="400" y="290" class="device-label">Écran</text>
+  <text x="400" y="310" class="device-label">Circulaire 4"</text>
+  
+  <!-- DSI Cable -->
+  <path d="M220 335 C 280 335, 320 280, 360 280" class="wire wire-dsi" />
+  <text x="290" y="315" class="gpio-label">Câble DSI</text>
+  
+  <!-- Power connection (optional) -->
+  <circle cx="125" cy="260" r="5" class="rpi-power" />
+  <text x="125" y="252" class="pin-label">5V</text>
+  <circle cx="440" cy="220" r="5" class="rpi-power" />
+  <text x="440" y="212" class="pin-label">VCC</text>
+  <path d="M125 265 C 125 310, 300 220, 440 225" class="wire wire-power" />
+  
+  <!-- Ground connection (optional) -->
+  <circle cx="145" cy="260" r="5" class="rpi-gpio" />
+  <text x="145" y="252" class="pin-label">GND</text>
+  <circle cx="460" cy="220" r="5" class="rpi-gpio" />
+  <text x="460" y="212" class="pin-label">GND</text>
+  <path d="M145 265 C 145 320, 350 220, 460 225" class="wire wire-gnd" />
+  
+  <!-- E-paper Display Wiring Section -->
+  <text x="400" y="430" class="section-title">2. Écran e-paper Waveshare 2.9 pouces (SPI)</text>
+  
+  <!-- Raspberry Pi Board for E-paper -->
+  <rect x="100" y="450" width="180" height="120" rx="10" class="rpi-board" />
+  <text x="190" y="480" class="device-label">Raspberry Pi 5</text>
+  
+  <!-- GPIO Header -->
+  <rect x="130" y="570" width="120" height="10" class="rpi-gpio" />
+  <text x="190" y="632" class="pin-label">GPIO Header</text>
+  
+  <!-- E-paper Display -->
+  <rect x="350" y="450" width="150" height="160" rx="5" class="epaper-display" />
+  <text x="425" y="490" class="device-label">E-paper</text>
+  <text x="425" y="510" class="device-label">2.9 pouces</text>
+  
+  <!-- GPIO Pins -->
+  <!-- Pin 1: 3.3V -->
+  <circle cx="140" cy="570" r="4" class="gpio-pin" />
+  <text x="140" y="588" class="pin-number" text-anchor="start" transform="rotate(90 140 588)">1/3.3V</text>
+  <!-- Pin 6: GND -->
+  <circle cx="150" cy="570" r="4" class="gpio-pin" />
+  <text x="150" y="588" class="pin-number" text-anchor="start" transform="rotate(90 150 588)">6/GND</text>
+  <!-- Pin 19: MOSI -->
+  <circle cx="160" cy="570" r="4" class="gpio-pin" />
+  <text x="160" y="588" class="pin-number" text-anchor="start" transform="rotate(90 160 588)">19/MOSI</text>
+  <!-- Pin 23: SCK -->
+  <circle cx="170" cy="570" r="4" class="gpio-pin" />
+  <text x="170" y="588" class="pin-number" text-anchor="start" transform="rotate(90 170 588)">23/SCK</text>
+  <!-- Pin 24: CS -->
+  <circle cx="180" cy="570" r="4" class="gpio-pin" />
+  <text x="180" y="588" class="pin-number" text-anchor="start" transform="rotate(90 180 588)">24/CS</text>
+  <!-- Pin 22: DC -->
+  <circle cx="190" cy="570" r="4" class="gpio-pin" />
+  <text x="190" y="588" class="pin-number" text-anchor="start" transform="rotate(90 190 588)">22/DC</text>
+  <!-- Pin 11: RST -->
+  <circle cx="200" cy="570" r="4" class="gpio-pin" />
+  <text x="200" y="588" class="pin-number" text-anchor="start" transform="rotate(90 200 588)">11/RST</text>
+  <!-- Pin 18: BUSY -->
+  <circle cx="210" cy="570" r="4" class="gpio-pin" />
+  <text x="210" y="588" class="pin-number" text-anchor="start" transform="rotate(90 210 588)">18/BUSY</text>
+  <!-- Pin 12: PWR (selon revision du module) -->
+  <circle cx="220" cy="570" r="4" class="gpio-pin" />
+  <text x="220" y="588" class="pin-number" text-anchor="start" transform="rotate(90 220 588)">12/PWR</text>
+  
+  <!-- E-paper Pins -->
+  <circle cx="350" cy="470" r="4" class="gpio-pin" />
+  <text x="340" y="470" class="gpio-label" text-anchor="end">VCC</text>
+  <circle cx="350" cy="485" r="4" class="gpio-pin" />
+  <text x="340" y="485" class="gpio-label" text-anchor="end">GND</text>
+  <circle cx="350" cy="500" r="4" class="gpio-pin" />
+  <text x="340" y="500" class="gpio-label" text-anchor="end">DIN</text>
+  <circle cx="350" cy="515" r="4" class="gpio-pin" />
+  <text x="340" y="515" class="gpio-label" text-anchor="end">CLK</text>
+  <circle cx="350" cy="530" r="4" class="gpio-pin" />
+  <text x="340" y="530" class="gpio-label" text-anchor="end">CS</text>
+  <circle cx="350" cy="545" r="4" class="gpio-pin" />
+  <text x="340" y="545" class="gpio-label" text-anchor="end">DC</text>
+  <circle cx="350" cy="560" r="4" class="gpio-pin" />
+  <text x="340" y="560" class="gpio-label" text-anchor="end">RST</text>
+  <circle cx="350" cy="575" r="4" class="gpio-pin" />
+  <text x="340" y="575" class="gpio-label" text-anchor="end">BUSY</text>
+  <circle cx="350" cy="590" r="4" class="gpio-pin" />
+  <text x="340" y="590" class="gpio-label" text-anchor="end">PWR</text>
+  
+  <!-- Connecting wires -->
+  <path d="M140 570 L 140 540 C 140 520, 250 470, 350 470" class="wire wire-power" />
+  <path d="M150 570 L 150 538 C 150 518, 255 485, 350 485" class="wire wire-gnd" />
+  <path d="M160 570 L 160 536 C 160 516, 260 500, 350 500" class="wire wire-spi" />
+  <path d="M170 570 L 170 534 C 170 514, 265 515, 350 515" class="wire wire-spi" />
+  <path d="M180 570 L 180 532 C 180 512, 270 530, 350 530" class="wire wire-signal" />
+  <path d="M190 570 L 190 530 C 190 510, 275 545, 350 545" class="wire wire-signal" />
+  <path d="M200 570 L 200 528 C 200 508, 280 560, 350 560" class="wire wire-signal" />
+  <path d="M210 570 L 210 526 C 210 506, 285 575, 350 575" class="wire wire-signal" />
+  <path d="M220 570 L 220 524 C 220 504, 290 590, 350 590" class="wire wire-power" />
+  
+  <!-- Thermal Printer Wiring Section -->
+  <text x="400" y="650" class="section-title">3. Imprimante thermique Epson TM-T70II (USB)</text>
+  
+  <!-- Raspberry Pi Board for Printer -->
+  <rect x="100" y="670" width="180" height="120" rx="10" class="rpi-board" />
+  <text x="190" y="700" class="device-label">Raspberry Pi 5</text>
+  
+  <!-- USB Ports -->
+  <rect x="100" y="710" width="20" height="40" rx="3" class="rpi-usb" />
+  <rect x="130" y="710" width="20" height="40" rx="3" class="rpi-usb" />
+  <text x="110" y="740" class="pin-label">USB</text>
+  
+  <!-- Thermal Printer -->
+  <rect x="350" y="670" width="180" height="120" rx="5" class="thermal-printer" />
+  <text x="440" y="710" class="device-label">Imprimante</text>
+  <text x="440" y="730" class="device-label">Thermique</text>
+  <text x="440" y="750" class="device-label">Epson TM-T70II</text>
+  
+  <!-- USB Cable -->
+  <path d="M120 730 C 180 730, 260 730, 350 730" class="wire wire-usb" />
+  <text x="230" y="720" class="gpio-label">Câble USB</text>
+  
+  <!-- Power cord to printer -->
+  <rect x="530" y="705" width="20" height="15" rx="2" class="rpi-power" />
+  <path d="M550 713 C 580 713, 600 713, 620 713" class="wire wire-power" />
+  <text x="575" y="703" class="gpio-label">Alimentation</text>
+  
+  <!-- HDMI Display Wiring Section -->
+  <text x="400" y="820" class="section-title">4. Écran HDMI standard</text>
+  
+  <!-- Raspberry Pi Board for HDMI -->
+  <rect x="100" y="840" width="180" height="120" rx="10" class="rpi-board" />
+  <text x="190" y="870" class="device-label">Raspberry Pi 5</text>
+  
+  <!-- HDMI Ports -->
+  <rect x="280" y="860" width="15" height="10" rx="2" class="rpi-hdmi" />
+  <text x="280" y="880" class="pin-label">HDMI0</text>
+  <rect x="280" y="890" width="15" height="10" rx="2" class="rpi-hdmi" />
+  <text x="280" y="910" class="pin-label">HDMI1</text>
+  
+  <!-- HDMI Display -->
+  <rect x="350" y="840" width="200" height="120" rx="5" class="hdmi-display" />
+  <rect x="370" y="860" width="160" height="80" rx="2" stroke="#333" stroke-width="1" fill="#D0D0D0" />
+  <text x="450" y="915" class="device-label">Écran HDMI</text>
+  
+  <!-- HDMI Cable -->
+  <path d="M295 865 C 320 865, 330 865, 350 865" class="wire wire-hdmi" />
+  <text x="320" y="855" class="gpio-label">Câble HDMI</text>
+  
+  <!-- Power cord to HDMI Display -->
+  <rect x="550" y="870" width="20" height="15" rx="2" class="rpi-power" />
+  <path d="M570 878 C 590 878, 600 878, 620 878" class="wire wire-power" />
+  <text x="600" y="868" class="gpio-label">Alimentation</text>
+
+  <text x="400" y="980" class="device-label">© 2025 - Schéma de câblage pour le système multi-écrans Raspberry Pi 5</text>
+</svg>
